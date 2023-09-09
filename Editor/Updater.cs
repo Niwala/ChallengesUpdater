@@ -8,10 +8,12 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
+using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
 using System.Runtime.CompilerServices;
+using UnityPackage = UnityEditor.PackageManager.PackageInfo;
 
 namespace Challenges
 {
@@ -65,6 +67,10 @@ namespace Challenges
         private static string updaterErrorTitle;
         private static string updaterErrorMessage;
 
+        private static Texture2D previewMask;
+        private static Shader previewShader;
+        private static Material previewMaterial;
+
         //Styles
         private GUIStyle titleStyle;
         private GUIStyle centredtitleStyle;
@@ -81,23 +87,71 @@ namespace Challenges
         private string challengesDir { get => $"{cacheDir}/Challenges"; }
 
 
+        //Ressources
+
         private void OnEnable()
         {
             teacher = EditorPrefs.GetString(TutoPack_Selector.lastTeacherPrefKey, "");
+
+            LoadResources();
             LoadCache();
 
-            Debug.Log("Updater deprecated " + UpdaterIsDeprecated());
+            SearchRequest request = Client.Search("com.niwala.challengesupdater", false);
+            EditorApplication.delayCall += () => LogRequest(request);
+
+
+
+            //UnityPackage updaterPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
         }
+
+        private void LogRequest(SearchRequest request)
+        {
+            if (request.IsCompleted)
+            {
+                Debug.Log("Error : " + request.Error?.errorCode + "  " + request.Error?.message);
+                Debug.Log("IsCompleted : " + request.IsCompleted);
+                Debug.Log("PackageIdOrName : " + request.PackageIdOrName);
+                Debug.Log("Result : " + request.Result?.Length);
+                for (int i = 0; i < request.Result?.Length; i++)
+                {
+                    Debug.Log("  " + request.Result[i].displayName);
+                }
+
+                Debug.Log("Status : " + request.Status);
+            }
+            else
+            {
+                EditorApplication.delayCall += () => LogRequest(request);
+            }
+        }
+
 
         private void OnDisable()
         {
             DestroyImmediate(target);
         }
 
-        //private string GetFilePath([CallerFilePath] string sourceFilePath = "")
-        //{
-        //    return sourceFilePath;
-        //}
+        private static void LoadResources()
+        {
+            string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "/Data/");
+            dataPath = dataPath.Remove(0, Application.dataPath.Length - 6);
+
+            if (previewMask == null)
+                previewMask = AssetDatabase.LoadAssetAtPath<Texture2D>(dataPath + "PreviewMask.png");
+
+            if (previewShader == null)
+                previewShader = AssetDatabase.LoadAssetAtPath<Shader>(dataPath + "PreviewShader.shader");
+
+            if (previewMaterial == null)
+                previewMaterial = new Material(previewShader);
+
+            previewMaterial.SetTexture("_Mask", previewMask);
+        }
+
+        private static string GetFilePath([CallerFilePath] string sourceFilePath = "")
+        {
+            return sourceFilePath;
+        }
 
         private bool UpdaterIsDeprecated()
         {
@@ -342,7 +396,7 @@ namespace Challenges
             if (status.preview != null)
             {
                 Rect previewRect = new Rect(rect.x + rect.width - (rect.height - 1) * 2 - 1, rect.y + 1, (rect.height - 1) * 2, rect.height - 2);
-                GUI.DrawTexture(previewRect, status.preview);
+                EditorGUI.DrawPreviewTexture(previewRect, status.preview, previewMaterial);
             }
 
 
@@ -602,8 +656,16 @@ namespace Challenges
             ChallengeInfo[] infos = packs.ToList().Select(x => new ChallengeInfo(x)).ToArray();
             string file = "";
 
+            //Repo directory
+            string directory = Application.dataPath.Remove(Application.dataPath.Length - 6) + "../Repository/";
+            if (!Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
+
             for (int i = 0; i < infos.Length; i++)
             {
+                if (infos[i].hidden)
+                    continue;
+
                 file += "\n## " + infos[i].name + "\n";
                 file += $"- Teacher : {infos[i].teacher}\n";
                 file += $"- Version : {infos[i].majorVersion}.{infos[i].minorVersion}\n";
@@ -611,16 +673,21 @@ namespace Challenges
 
                 if (packs[i].preview != null)
                 {
-                    Debug.Log(packs[i].name + "  "+ infos[i].name + "  " +  packs[i].preview?.name);
-                    file += $"![](/Images/{packs[i].preview.name}.png)\n";
+                    //Copy image
+                    string imgSource = AssetDatabase.GetAssetPath(packs[i].preview);
+                    string imgDest = $"{directory}Images/{packs[i].name}.jpg";
+                    Texture2D tex = new Texture2D(2, 2);
+                    tex.LoadImage(File.ReadAllBytes(imgSource));
+                    File.WriteAllBytes(imgDest, tex.EncodeToJPG());
+
+                    //Add image link to readme
+                    file += $"![](/Images/{packs[i].name}.jpg)\n";
                 }
 
                 file += "\n";
             }
 
-            string directory = Application.dataPath.Remove(Application.dataPath.Length - 6) + "../Repository/";
-            if (!Directory.Exists(directory))
-                Directory.CreateDirectory(directory);
+
 
             File.WriteAllText(directory + "Readme.md", file);
         }
