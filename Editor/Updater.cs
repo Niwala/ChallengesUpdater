@@ -629,9 +629,25 @@ namespace Challenges
 
             if (!string.IsNullOrEmpty(pack.onOpen))
             {
-                string type = pack.onOpen.Split('.')[0];
-                MethodInfo method = Assembly.GetExecutingAssembly().GetType(type).GetMethod(pack.onOpen.Split('.')[1], BindingFlags.Static | BindingFlags.Public);
-                method.Invoke("", new object[0]);
+                string typeName = pack.onOpen.Split('.')[0];
+                string methodName = pack.onOpen.Split('.')[1];
+
+                System.Type[] types = Assembly.GetExecutingAssembly().GetTypes();
+                for (int i = 0; i < types.Length; i++)
+                {
+                    if (types[i].Name != typeName)
+                        continue;
+
+                    MethodInfo[] methods = types[i].GetMethods(BindingFlags.Static | BindingFlags.Public);
+                    for (int j = 0; j < methods.Length; j++)
+                    {
+                        if (methods[j].Name == methodName)
+                        {
+                            methods[j].Invoke("", new object[0]);
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -756,7 +772,6 @@ namespace Challenges
             for (int i = 0; i < packs.Count; i++)
             {
                 nameToPack.Add(packs[i].name, packs[i]);
-                Debug.Log("Existing pack " + packs[i].name);
             }
 
 
@@ -765,7 +780,6 @@ namespace Challenges
             for (int i = 0; i < sortedChallenges.Count; i++)
             {
                 ChallengeInfo info = sortedChallenges[i];
-                Debug.Log("Chec info on " + info.name);
                 if (nameToPack.ContainsKey(info.name))
                 {
                     TutoPack pack = nameToPack[info.name];
