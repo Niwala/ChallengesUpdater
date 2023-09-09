@@ -23,6 +23,7 @@ namespace Challenges
         public const string gitRepo = "Challenges";
         public static string gitDownloadUrl = @$"https://raw.githubusercontent.com//{gitOwner}/{gitRepo}/main";
         public static string gitContentUrl = @$"https://api.github.com/repos/{gitOwner}/{gitRepo}/contents";
+        public static string gitBlobUrl = @$"https://github.com/{gitOwner}/{gitRepo}/blob/main";
         public static string gitToken = "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";
 
         [MenuItem("Challenges/Updater &U")]
@@ -200,6 +201,8 @@ namespace Challenges
                 menu.AddItem(new GUIContent("Refresh"), false, () => { UpdateCache(); });
                 if (Event.current.shift)
                     menu.AddItem(new GUIContent("Generate Index File"), false, () => { GenerateIndexFile(); });
+                if (Event.current.shift)
+                    menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
                 if (Event.current.shift)
                     menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateIndexFile(); ExportAllChallenges(); });
 
@@ -587,6 +590,39 @@ namespace Challenges
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
             File.WriteAllText(directory + "Index.json", file);
+        }
+
+        private void GenerateReadme()
+        {
+            string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
+            List<TutoPack> packs = tutoPackGUIDs.ToList().
+                Select(x => AssetDatabase.LoadAssetAtPath<TutoPack>(AssetDatabase.GUIDToAssetPath(x))).
+                Where(x => x != null && x.majorVersion > 0).ToList();
+
+            ChallengeInfo[] infos = packs.ToList().Select(x => new ChallengeInfo(x)).ToArray();
+            string file = "";
+
+            for (int i = 0; i < infos.Length; i++)
+            {
+                file += "\n## " + infos[i].name + "\n";
+                file += $"- Teacher : {infos[i].teacher}\n";
+                file += $"- Version : {infos[i].majorVersion}.{infos[i].minorVersion}\n";
+                file += $"```\n{infos[i].description}\n```\n";
+
+                if (packs[i].preview != null)
+                {
+                    Debug.Log(packs[i].name + "  "+ infos[i].name + "  " +  packs[i].preview?.name);
+                    file += $"![](/Images/{packs[i].preview.name}.png)\n";
+                }
+
+                file += "\n";
+            }
+
+            string directory = Application.dataPath.Remove(Application.dataPath.Length - 6) + "../Repository/";
+            if (!Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllText(directory + "Readme.md", file);
         }
 
         private void CheckCacheDirectories()
