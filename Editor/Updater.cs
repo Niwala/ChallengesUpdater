@@ -133,8 +133,20 @@ namespace Challenges
 
         private static void LoadResources()
         {
-            string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "/Data/");
-            dataPath = dataPath.Remove(0, Application.dataPath.Length - 6);
+            //Get data directory
+            string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "Data\\");
+
+            //Plugin is in Assets
+            if (dataPath.StartsWith(Application.dataPath))
+            {
+                dataPath = dataPath.Remove(0, Application.dataPath.Length - 6);
+            }
+
+            //Plugin is in Package Cache
+            else
+            {
+                dataPath = "Packages\\com.niwala.challengesupdater\\Editor\\Data\\";
+            }
 
             if (previewMask == null)
                 previewMask = AssetDatabase.LoadAssetAtPath<Texture2D>(dataPath + "PreviewMask.png");
