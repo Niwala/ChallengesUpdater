@@ -1122,6 +1122,18 @@ namespace Challenges
             ChallengeInfo infos = new ChallengeInfo(pack);
             string jsonFile = JsonUtility.ToJson(infos, true);
             File.WriteAllText($"{path}{pack.name}.json", jsonFile);
+
+
+            //Export challenge preview
+            if (pack.preview != null)
+            {
+                //Copy image
+                string imgSource = AssetDatabase.GetAssetPath(pack.preview);
+                string imgDest = $"{path}{pack.name}.jpg";
+                Texture2D tex = new Texture2D(2, 2);
+                tex.LoadImage(File.ReadAllBytes(imgSource));
+                File.WriteAllBytes(imgDest, tex.EncodeToJPG());
+            }
         }
 
         //Preview

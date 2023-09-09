@@ -83,8 +83,7 @@ namespace Challenges
         private GUIContent refreshIcon;
         private bool stylesLoaded;
 
-        private string cacheDir { get => "../Temp/ChallengesUpdater/Cache"; }
-        private string challengesDir { get => $"{cacheDir}/Challenges"; }
+        private string cacheDir { get => "Temp/ChallengesUpdater"; }
 
 
         //Ressources
@@ -128,7 +127,6 @@ namespace Challenges
             }
         }
 
-
         private void OnDisable()
         {
             DestroyImmediate(target);
@@ -140,7 +138,7 @@ namespace Challenges
             string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "Data\\");
 
             //Plugin is in Assets
-            if (dataPath.StartsWith(Application.dataPath))
+            if (dataPath.StartsWith(Application.dataPath.Replace('/', '\\')))
             {
                 dataPath = dataPath.Remove(0, Application.dataPath.Length - 6);
             }
@@ -176,7 +174,7 @@ namespace Challenges
                 return true;
 
             Debug.Log(info.versions.latest + "  " + info.version);
-            
+
 
             return info.isDeprecated;
         }
@@ -686,23 +684,12 @@ namespace Challenges
                 file += $"- Version : {infos[i].majorVersion}.{infos[i].minorVersion}\n";
                 file += $"```\n{infos[i].description}\n```\n";
 
+                //Add image link to readme
                 if (packs[i].preview != null)
-                {
-                    //Copy image
-                    string imgSource = AssetDatabase.GetAssetPath(packs[i].preview);
-                    string imgDest = $"{directory}Images/{packs[i].name}.jpg";
-                    Texture2D tex = new Texture2D(2, 2);
-                    tex.LoadImage(File.ReadAllBytes(imgSource));
-                    File.WriteAllBytes(imgDest, tex.EncodeToJPG());
-
-                    //Add image link to readme
-                    file += $"![](/Images/{packs[i].name}.jpg)\n";
-                }
+                    file += $"![](/Challenges/{packs[i].name}.jpg)\n";
 
                 file += "\n";
             }
-
-
 
             File.WriteAllText(directory + "Readme.md", file);
         }
@@ -711,8 +698,6 @@ namespace Challenges
         {
             if (!Directory.Exists(cacheDir))
                 Directory.CreateDirectory(cacheDir);
-            if (!Directory.Exists(challengesDir))
-                Directory.CreateDirectory(challengesDir);
         }
 
         private void LoadCache()
@@ -732,37 +717,55 @@ namespace Challenges
 
 
             //Read all challenge infos
-            List<ChallengeInfo> infos = new List<ChallengeInfo>();
-            string[] files = Directory.GetFiles(challengesDir);
+            Dictionary<string, ChallengeInfo> infos = new Dictionary<string, ChallengeInfo>();
+            string[] files = Directory.GetFiles(cacheDir);
             for (int i = 0; i < files.Length; i++)
             {
+                string challengeName = files[i].Split('.')[0];
+
+                if (!infos.ContainsKey(challengeName))
+                    infos.Add(challengeName, default);
+
                 if (files[i].EndsWith(".json"))
                 {
-                    string file = File.ReadAllText(files[i]);
-                    infos.Add(JsonUtility.FromJson<ChallengeInfo>(file));
+                    ChallengeInfo info = infos[challengeName];
+                    Texture2D preview = info.preview;
+                    info = JsonUtility.FromJson<ChallengeInfo>(File.ReadAllText(files[i]));
+                    info.preview = preview;
+                    infos[challengeName] = info;
+                }
+                else if (files[i].EndsWith(".jpg"))
+                {
+                    ChallengeInfo info = infos[challengeName];
+                    info.preview = new Texture2D(2, 2);
+                    info.preview.LoadImage(File.ReadAllBytes(files[i]));
+                    infos[challengeName] = info;
                 }
             }
 
-
             //Reorder infos
-            infos = infos.Where(x => !x.hidden).OrderBy(x => x.priority).ToList();
+            List<ChallengeInfo> sortedChallenges = new List<ChallengeInfo>();
+            sortedChallenges = infos.Values.Where(x => !x.hidden && !string.IsNullOrEmpty(x.name)).OrderBy(x => x.priority).ToList();
 
             //Load local packs
             string[] challengeGUIDs = AssetDatabase.FindAssets($"t:{typeof(TutoPack).Name}");
             List<TutoPack> packs = challengeGUIDs.ToList().
                 Select(x => AssetDatabase.LoadAssetAtPath<TutoPack>(AssetDatabase.GUIDToAssetPath(x))).
-                Where(x => x != null).OrderBy(x => x.priority).ToList();
+                Where(x => x != null && !x.hidden).OrderBy(x => x.priority).ToList();
             Dictionary<string, TutoPack> nameToPack = new Dictionary<string, TutoPack>();
             for (int i = 0; i < packs.Count; i++)
+            {
                 nameToPack.Add(packs[i].name, packs[i]);
+                Debug.Log("Existing pack " + packs[i].name);
+            }
 
 
             //Update status list
             challengeList.Clear();
-            for (int i = 0; i < infos.Count; i++)
+            for (int i = 0; i < sortedChallenges.Count; i++)
             {
-                ChallengeInfo info = infos[i];
-
+                ChallengeInfo info = sortedChallenges[i];
+                Debug.Log("Chec info on " + info.name);
                 if (nameToPack.ContainsKey(info.name))
                 {
                     TutoPack pack = nameToPack[info.name];
@@ -804,57 +807,92 @@ namespace Challenges
                 string file = JsonUtility.ToJson(projectInfo);
                 File.WriteAllText($"{cacheDir}/UpdaterInfo.json", file);
 
-                SearchChallenges();
+                GetGitFileList();
             });
 
-            //Find all available challenges
-            void SearchChallenges()
+            //Get a list of all file under Challenges directory
+            void GetGitFileList()
             {
                 //Get all elements in Challenges directory
                 UnityWebRequest request = UnityWebRequest.Get($@"{Updater.gitContentUrl}/Challenges");
                 request.SetRequestHeader("authorization", Updater.gitToken);
-                request.SendWebRequest().completed += OnChallengesFound;
+                request.SendWebRequest().completed += OnGetGitFileList;
             }
 
-            //All the challenge paths are found.
-            void OnChallengesFound(AsyncOperation obj)
+            //All the files on git are listed
+            void OnGetGitFileList(AsyncOperation obj)
             {
                 UnityWebRequest request = (obj as UnityWebRequestAsyncOperation).webRequest;
                 if (LogErrorIfAny(request))
                     return;
 
                 GitElement[] elements = GetJsonArray<GitElement>(request.downloadHandler.text);
-                Queue<string> challengeInfoUrls = new Queue<string>();
-
                 if (elements == null)
                     return;
 
+                Dictionary<string, GitChallenge> gitChallenges = new Dictionary<string, GitChallenge>();
+                Queue<GitChallenge> toDownload = new Queue<GitChallenge>();
+
                 for (int i = 0; i < elements.Length; i++)
                 {
-                    if (elements[i].isJson)
-                        challengeInfoUrls.Enqueue(elements[i].download_url);
+                    string challengeName = elements[i].name.Split('.')[0];
+                    if (!gitChallenges.ContainsKey(challengeName))
+                    {
+                        GitChallenge gitChallenge = new GitChallenge();
+                        gitChallenges.Add(challengeName, gitChallenge);
+                        toDownload.Enqueue(gitChallenge);
+                    }
+                    gitChallenges[challengeName].AddElement(elements[i]);
                 }
 
-                DownloadChallengeInfos(challengeInfoUrls, OnCacheUpdated);
+                DownloadChallengeInfos(toDownload, OnCacheUpdated);
             }
 
-            //Download challenge infos
-            void DownloadChallengeInfos(Queue<string> urls, System.Action endCallback)
+            //Act like a loop iterating on gitChallenges
+            void DownloadChallengeInfos(Queue<GitChallenge> gitChallenges, System.Action endCallback)
             {
-                if (urls.Count == 0)
+                if (gitChallenges.Count == 0)
                 {
                     endCallback.Invoke();
                     return;
                 }
 
-                DownloadFile(urls.Dequeue(), (DownloadHandler handler) =>
+                GitChallenge gitChallenge = gitChallenges.Dequeue();
+
+                DownloadFile(gitChallenge.info.download_url, (DownloadHandler handler) =>
                 {
-                    ChallengeInfo info = JsonUtility.FromJson<ChallengeInfo>(handler.text);
-                    string file = JsonUtility.ToJson(info);
-                    File.WriteAllText($"{challengesDir}/{info.name}.json", file);
-                    DownloadChallengeInfos(urls, endCallback);
+                    //Read downloaded file
+                    ChallengeInfo downloaded = JsonUtility.FromJson<ChallengeInfo>(handler.text);
+                    string infoFilePath = $"{cacheDir}/{downloaded.name}.json";
+                    string previewFilePath = $"{cacheDir}/{downloaded.name}.jpg";
+
+                    //Read existing info in cache
+                    ChallengeInfo existing = default;
+                    if (File.Exists(infoFilePath))
+                    {
+                        existing = JsonUtility.FromJson<ChallengeInfo>(File.ReadAllText(infoFilePath));
+                    }
+
+                    //If preview don't exist or challenge version changed -> Download preview
+                    if (!string.IsNullOrEmpty(gitChallenge.preview.download_url))
+                    {
+                        if (existing.minorVersion != downloaded.minorVersion || existing.majorVersion != downloaded.majorVersion || !File.Exists(previewFilePath))
+                        {
+                            DownloadFile(gitChallenge.preview.download_url, (DownloadHandler handler) =>
+                            {
+                                File.WriteAllBytes(previewFilePath, handler.data);
+                            });
+                        }
+                    }
+
+                    //Overide existing info by the downloaded one
+                    File.WriteAllText(infoFilePath, JsonUtility.ToJson(downloaded));
+
+                    //Download next challenge
+                    DownloadChallengeInfos(gitChallenges, endCallback);
                 });
             }
+
 
             void OnCacheUpdated()
             {
@@ -870,10 +908,6 @@ namespace Challenges
 
             for (int i = 0; i < challengeList.Count; i++)
             {
-                //Hidden filter
-                if (challengeList[i].hidden)
-                    continue;
-
                 //Teacher filter
                 if (!string.IsNullOrEmpty(teacher) && challengeList[i].teacher != teacher)
                     continue;
@@ -917,7 +951,6 @@ namespace Challenges
         {
             public TutoPack pack;
             public string name;
-            public bool hidden;
             public string teacher;
             public string tags;
             public string description;
@@ -928,27 +961,39 @@ namespace Challenges
             {
                 this.pack = pack;
                 this.name = pack.name;
-                this.hidden = pack.hidden;
                 this.status = status;
                 this.teacher = pack.teacher;
                 this.tags = pack.tags;
                 this.description = pack.description;
-                if (pack.preview != null)
-                    this.preview = pack.preview;
-                else
-                    this.preview = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Challenges/{name}/Tuto Resources/Preview.png");
+                this.preview = pack.preview;
             }
 
             public Status(ChallengeInfo infos, ChallengeStatus status)
             {
                 this.pack = null;
                 this.name = infos.name;
-                this.hidden = infos.hidden;
                 this.status = status;
                 this.teacher = infos.teacher;
                 this.tags = infos.tags;
                 this.description = infos.description;
-                this.preview = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Challenges/{name}/Tuto Resources/Preview.png");
+                this.preview = infos.preview;
+            }
+        }
+
+        private class GitChallenge
+        {
+            public GitElement unityPackage;
+            public GitElement info;
+            public GitElement preview;
+
+            public void AddElement(GitElement element)
+            {
+                if (element.name.EndsWith(".unitypackage"))
+                    unityPackage = element;
+                else if (element.name.EndsWith(".json"))
+                    info = element;
+                else if (element.name.EndsWith(".jpg"))
+                    preview = element;
             }
         }
 
@@ -1006,6 +1051,7 @@ namespace Challenges
             public int majorVersion;
             public float priority;
             public bool hidden;
+            public Texture2D preview;
 
             public ChallengeInfo(TutoPack pack)
             {
@@ -1017,6 +1063,7 @@ namespace Challenges
                 majorVersion = pack.majorVersion;
                 priority = pack.priority;
                 hidden = pack.hidden;
+                preview = pack.preview;
             }
         }
 
