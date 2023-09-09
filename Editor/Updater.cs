@@ -9,6 +9,9 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using UnityEditor.SceneManagement;
+using UnityEditor.PackageManager;
+using UnityEditor.PackageManager.Requests;
+using System.Runtime.CompilerServices;
 
 namespace Challenges
 {
@@ -73,7 +76,7 @@ namespace Challenges
         private GUIContent refreshIcon;
         private bool stylesLoaded;
 
-        private string cacheDir { get => "Assets/Updater/Cache"; }
+        private string cacheDir { get => "../Temp/ChallengesUpdater/Cache"; }
         private string challengesDir { get => $"{cacheDir}/Challenges"; }
 
 
@@ -81,11 +84,31 @@ namespace Challenges
         {
             teacher = EditorPrefs.GetString(TutoPack_Selector.lastTeacherPrefKey, "");
             LoadCache();
+
+            Debug.Log("Updater deprecated " + UpdaterIsDeprecated());
         }
 
         private void OnDisable()
         {
             DestroyImmediate(target);
+        }
+
+        //private string GetFilePath([CallerFilePath] string sourceFilePath = "")
+        //{
+        //    return sourceFilePath;
+        //}
+
+        private bool UpdaterIsDeprecated()
+        {
+            UnityEditor.PackageManager.PackageInfo info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(Assembly.GetExecutingAssembly());
+
+            if (info == null)
+                return true;
+
+            Debug.Log(info.versions.latest + "  " + info.version);
+            
+
+            return info.isDeprecated;
         }
 
         private void LoadStyles()
