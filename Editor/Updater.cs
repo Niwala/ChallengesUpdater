@@ -96,12 +96,15 @@ namespace Challenges
             LoadResources();
             LoadCache();
 
-            SearchRequest request = Client.Search("com.niwala.challengesupdater", false);
-            EditorApplication.delayCall += () => LogRequest(request);
 
+            UnityPackage updaterPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
 
-
-            //UnityPackage updaterPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+            if (updaterPackage != null)
+            {
+                Debug.Log("Start search on id " + updaterPackage.packageId);
+                SearchRequest request = Client.Search(updaterPackage.packageId, false);
+                EditorApplication.delayCall += () => LogRequest(request);
+            }
         }
 
         private void LogRequest(SearchRequest request)
