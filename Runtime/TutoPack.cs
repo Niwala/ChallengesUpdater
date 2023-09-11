@@ -13,8 +13,6 @@ namespace Challenges
         [Multiline(6)]
         public string description;
         public Texture2D preview;
-        public int majorVersion;
-        public int minorVersion;
         public float priority;
         public bool hidden;
         public string teacher;
@@ -22,12 +20,37 @@ namespace Challenges
         public string tags;
         public Object scene;
         public string onOpen;
+        public Hash128 hash;
+
+        public void UpdateHash()
+        {
+            hash = preview.imageContentsHash;
+            hash.Append(pages.Count);
+            for (int i = 0; i < pages.Count; i++)
+                hash.Append(pages[i].GetHash().ToString());
+            hash.Append(description);
+            hash.Append(priority);
+            hash.Append(hidden.ToString());
+            hash.Append(teacher);
+            hash.Append(tags);
+            hash.Append(scene.GetHashCode());
+            hash.Append(onOpen);
+        }
     }
 
     [System.Serializable]
     public class TutoPage
     {
         public List<Content> content = new List<Content>();
+
+        public Hash128 GetHash()
+        {
+            Hash128 hash = new Hash128();
+            hash.Append(content.Count);
+            for (int i = 0; i < content.Count; i++)
+                hash.Append(content[i].GetHash().ToString());
+            return hash;
+        }
 
         [System.Serializable]
         public struct Content
@@ -36,6 +59,16 @@ namespace Challenges
             [Multiline] public string text;
             public int padding;
             public Object obj;
+
+            public Hash128 GetHash()
+            {
+                Hash128 hash = new Hash128();
+                hash.Append((int)type);
+                hash.Append(text);
+                hash.Append(padding);
+                hash.Append(obj?.GetInstanceID() ?? 0);
+                return hash;
+            }
         }
 
         public enum Type

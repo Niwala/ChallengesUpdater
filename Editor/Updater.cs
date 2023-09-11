@@ -95,29 +95,38 @@ namespace Challenges
             LoadResources();
             LoadCache();
 
+            string filePath = GetFilePath().Replace('\\', '/');
+            bool pluginIsInPackage = !filePath.StartsWith(Application.dataPath);
+            Debug.Log(pluginIsInPackage);
 
-            UnityPackage updaterPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-
-            if (updaterPackage != null)
+            if (pluginIsInPackage)
             {
-                Debug.Log("Start search on id " + updaterPackage.packageId);
-                SearchRequest request = Client.Search(updaterPackage.packageId, false);
-                EditorApplication.delayCall += () => LogRequest(request);
+                AddRequest addRequest = Client.Add("https://github.com/Niwala/ChallengesUpdater.git");
+                LogRequest(addRequest);
             }
+
+            //UnityPackage updaterPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+
+            //if (updaterPackage != null)
+            //{
+            //    Debug.Log("Start search on id " + updaterPackage.packageId);
+            //    SearchRequest request = Client.Search(updaterPackage.packageId, false);
+            //    EditorApplication.delayCall += () => LogRequest(request);
+            //}
         }
 
-        private void LogRequest(SearchRequest request)
+        private void LogRequest(AddRequest request)
         {
             if (request.IsCompleted)
             {
                 Debug.Log("Error : " + request.Error?.errorCode + "  " + request.Error?.message);
                 Debug.Log("IsCompleted : " + request.IsCompleted);
-                Debug.Log("PackageIdOrName : " + request.PackageIdOrName);
-                Debug.Log("Result : " + request.Result?.Length);
-                for (int i = 0; i < request.Result?.Length; i++)
-                {
-                    Debug.Log("  " + request.Result[i].displayName);
-                }
+                //Debug.Log("PackageIdOrName : " + request.PackageIdOrName);
+                //Debug.Log("Result : " + request.Result?.Length);
+                //for (int i = 0; i < request.Result?.Length; i++)
+                //{
+                //    Debug.Log("  " + request.Result[i].displayName);
+                //}
 
                 Debug.Log("Status : " + request.Status);
             }
@@ -664,7 +673,7 @@ namespace Challenges
             string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
             List<TutoPack> packs = tutoPackGUIDs.ToList().
                 Select(x => AssetDatabase.LoadAssetAtPath<TutoPack>(AssetDatabase.GUIDToAssetPath(x))).
-                Where(x => x != null && x.majorVersion > 0).ToList();
+                Where(x => x != null).ToList();
 
             ChallengeInfo[] infos = packs.ToList().Select(x => new ChallengeInfo(x)).ToArray();
             string file = JsonUtility.ToJson(ProjectInfo.CurrentProjectInfo, true);
@@ -680,7 +689,7 @@ namespace Challenges
             string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
             List<TutoPack> packs = tutoPackGUIDs.ToList().
                 Select(x => AssetDatabase.LoadAssetAtPath<TutoPack>(AssetDatabase.GUIDToAssetPath(x))).
-                Where(x => x != null && x.majorVersion > 0).ToList();
+                Where(x => x != null).ToList();
 
             ChallengeInfo[] infos = packs.ToList().Select(x => new ChallengeInfo(x)).ToArray();
             string file = "";
@@ -697,7 +706,7 @@ namespace Challenges
 
                 file += "\n## " + infos[i].name + "\n";
                 file += $"- Teacher : {infos[i].teacher}\n";
-                file += $"- Version : {infos[i].majorVersion}.{infos[i].minorVersion}\n";
+                file += $"- Hash : {infos[i].hash}\n";
                 file += $"```\n{infos[i].description}\n```\n";
 
                 //Add image link to readme
@@ -783,13 +792,8 @@ namespace Challenges
                 if (nameToPack.ContainsKey(info.name))
                 {
                     TutoPack pack = nameToPack[info.name];
-                    if (pack.majorVersion == info.majorVersion)
-                    {
-                        if (pack.minorVersion == info.minorVersion)
-                            challengeList.Add(new Status(pack, ChallengeStatus.Good));
-                        else
-                            challengeList.Add(new Status(pack, ChallengeStatus.MinorUpdate));
-                    }
+                    if (pack.hash == info.hash)
+                        challengeList.Add(new Status(pack, ChallengeStatus.Good));
                     else
                         challengeList.Add(new Status(pack, ChallengeStatus.MajorUpdate));
 
@@ -890,7 +894,7 @@ namespace Challenges
                     //If preview don't exist or challenge version changed -> Download preview
                     if (!string.IsNullOrEmpty(gitChallenge.preview.download_url))
                     {
-                        if (existing.minorVersion != downloaded.minorVersion || existing.majorVersion != downloaded.majorVersion || !File.Exists(previewFilePath))
+                        if (existing.hash != downloaded.hash || !File.Exists(previewFilePath))
                         {
                             DownloadFile(gitChallenge.preview.download_url, (DownloadHandler handler) =>
                             {
@@ -1061,8 +1065,7 @@ namespace Challenges
             public string teacher;
             public string tags;
             public string description;
-            public int minorVersion;
-            public int majorVersion;
+            public Hash128 hash;
             public float priority;
             public bool hidden;
             public Texture2D preview;
@@ -1073,8 +1076,7 @@ namespace Challenges
                 teacher = pack.teacher;
                 tags = pack.tags;
                 description = pack.description;
-                minorVersion = pack.minorVersion;
-                majorVersion = pack.majorVersion;
+                hash = pack.hash;
                 priority = pack.priority;
                 hidden = pack.hidden;
                 preview = pack.preview;

@@ -2,6 +2,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Diagnostics;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,6 +10,7 @@ using UnityEngine.Networking;
 using UnityEngine.Video;
 using UnityEditorInternal;
 using ChallengeInfo = Challenges.Updater_Editor.ChallengeInfo;
+using Debug = UnityEngine.Debug;
 
 namespace Challenges
 {
@@ -207,7 +209,11 @@ namespace Challenges
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Auto Select"), autoSelect, () => { TutoPack_Selector.ToggleAutoSelect(); });
                 if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Edit Tuto"), false, () => { editTuto = !editTuto; });
+                {
+                    menu.AddSeparator("");
+                    menu.AddItem(new GUIContent("Edit"), false, () => { editTuto = !editTuto; });
+                    menu.AddItem(new GUIContent("Publish"), false, () => { PublisherInfoEditor.Open(OnPublish); });
+                }
                 menu.DropDown(rect);
             }
             GUILayout.EndHorizontal();
@@ -234,6 +240,71 @@ namespace Challenges
                 pack.pages.Insert(page + 1, pack.pages[page].Copy());
                 page = Mathf.Clamp(page + 1, 0, pack.pages.Count - 1);
                 EditorUtility.SetDirty(target);
+            }
+        }
+
+        private void OnPublish()
+        {
+            string repository = EditorPrefs.GetString($"{PublisherInfoEditor.prefPrefix}_Repository");
+
+            //Check repository
+            if (!repository.EndsWith('/') || !repository.EndsWith('\\'))
+                repository += "\\";
+            string directory = $"{repository}Challenges\\";
+            if (!Directory.Exists(directory))
+            {
+                EditorUtility.DisplayDialog($"Publish {pack.name}", "The repository specified does not contain a \"Challenges\" folder.", "Ok");
+                return;
+            }
+
+            ExportAt(pack, directory);
+
+            //if (EditorUtility.DisplayDialog($"Publish {pack.name}", $"This will make the pack public and accessible to all students.", "Continue", "Cancel"))
+            {
+                Process cmd = new Process();
+                ProcessStartInfo info = new ProcessStartInfo();
+                info.FileName = "cmd.exe";
+                info.RedirectStandardInput = true;
+                info.RedirectStandardOutput = true;
+                info.UseShellExecute = false;
+                info.CreateNoWindow = true;
+                info.WindowStyle = ProcessWindowStyle.Hidden;
+                info.WorkingDirectory = repository;
+
+                cmd.StartInfo = info;
+                cmd.Start();
+
+                using (StreamWriter sw = cmd.StandardInput)
+                {
+                    if (sw.BaseStream.CanWrite)
+                    {
+                        EditorUtility.DisplayProgressBar($"Publish {pack.name}", "Checkout...", 0.0f);
+                        sw.WriteLine($"git checkout main");
+
+                        EditorUtility.DisplayProgressBar($"Publish {pack.name}", "Fetch...", 0.2f);
+                        sw.WriteLine($"git fetch origin main");
+
+                        EditorUtility.DisplayProgressBar($"Publish {pack.name}", "Rebase...", 0.4f);
+                        sw.WriteLine($"git rebase -i origin/main");
+
+                        EditorUtility.DisplayProgressBar($"Publish {pack.name}", "Add files...", 0.6f);
+                        sw.WriteLine($"git add {directory}{pack.name}.unitypackage");
+                        sw.WriteLine($"git add {directory}{pack.name}.json");
+                        sw.WriteLine($"git add {directory}{pack.name}.jpg");
+
+                        EditorUtility.DisplayProgressBar($"Publish {pack.name}", "Get Status...", 0.8f);
+                        sw.WriteLine($"git status");
+
+                        EditorUtility.DisplayProgressBar($"Publish {pack.name}", "Push...", 1.0f);
+                        sw.WriteLine($"git commit -am \"Publish {pack.name}\"");
+                        sw.WriteLine($"git push origin main");
+                    }
+                }
+
+
+                cmd.WaitForExit();
+                EditorUtility.ClearProgressBar();
+                Debug.Log(cmd.StandardOutput.ReadToEnd());
             }
         }
 
@@ -428,7 +499,7 @@ namespace Challenges
                     report += $"\nUnity account : {CloudProjectSettings.userName}";
                     report += $"\nUsername : {username}";
                     report += $"\nCurrent scene : {EditorSceneManager.GetActiveScene().name}";
-                    report += $"\nChallenge Version : {pack.majorVersion}.{pack.minorVersion}";
+                    report += $"\nChallenge Hash : {pack.hash}";
                     report += $"\nUpdater Version : {Updater.projectVersion}";
                     report += $"\nCurrent page : {page}```";
                     Embed embed = new Embed("Error report", report, Color.red);
@@ -501,7 +572,7 @@ namespace Challenges
             report += $"\nTime : {System.DateTime.Now.ToLongTimeString() + " " + System.DateTime.Now.ToLongDateString()}";
             report += $"\nUnity account : {CloudProjectSettings.userName}";
             report += $"\nCurrent scene : {EditorSceneManager.GetActiveScene().name}";
-            report += $"\nChallenge Version : {pack.majorVersion}.{pack.minorVersion}";
+            report += $"\nChallenge Hash : {pack.hash}";
             report += $"\nUpdater Version : {Updater.projectVersion}";
             report += $"\nCurrent page : {page}```";
 
@@ -778,7 +849,7 @@ namespace Challenges
             }
 
             Rect labelRect = new Rect(50, 10, Screen.width - 100, 23);
-            string label = ObjectNames.NicifyVariableName(pack.name) + $" <color=grey><size=12>{pack.majorVersion}.{pack.minorVersion}</size></color>";
+            string label = ObjectNames.NicifyVariableName(pack.name);
             string pageLabel = $"<size=14>Page {page + 1} / {pack.pages.Count}</size>";
             GUIStyle pageStyle = new GUIStyle(subtitleStyle);
             pageStyle.alignment = TextAnchor.MiddleCenter;
@@ -808,6 +879,7 @@ namespace Challenges
             targetObject.UpdateIfRequiredOrScript();
             GUILayout.Label(pack.name, titleStyle);
             GUILayout.Space(5);
+            GUILayout.Label("Hash : " + pack.hash.ToString());
             EditorGUILayout.PropertyField(targetObject.FindProperty("hidden"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("teacher"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("scene"));
@@ -815,19 +887,14 @@ namespace Challenges
             EditorGUILayout.PropertyField(targetObject.FindProperty("tags"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("description"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("preview"));
-            EditorGUILayout.PropertyField(targetObject.FindProperty("minorVersion"));
-            EditorGUILayout.PropertyField(targetObject.FindProperty("majorVersion"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("priority"));
             targetObject.ApplyModifiedProperties();
-
-            if (pack.majorVersion < 1)
-            {
-                EditorGUILayout.HelpBox("As long as the major version is smaller than 1 the challenge will not be included in the index.", MessageType.Warning);
-            }
 
             GUILayout.Space(20);
             if (GUILayout.Button("Export"))
                 Export(pack);
+            if (GUILayout.Button("Publish"))
+                PublisherInfoEditor.Open(OnPublish);
 
             GUILayout.EndVertical();
         }
@@ -1103,25 +1170,34 @@ namespace Challenges
 
         public static void Export(TutoPack pack)
         {
+            string path = Application.dataPath + "/../../Repository/Challenges/";
+            ExportAt(pack, path);
+        }
+
+        public static void ExportAt(TutoPack pack, string directory)
+        {
+            //Update pack hash
+            pack.UpdateHash();
+
+
             //Get path
             string contentPath = new FileInfo(AssetDatabase.GetAssetPath(pack)).DirectoryName;
             contentPath = contentPath.Substring(Application.dataPath.Length - 6);
-            string path = Application.dataPath + "/../../Repository/Challenges/";
 
 
             //Create directory if needed
-            if (!Directory.Exists(path))
-                Directory.CreateDirectory(path);
+            if (!Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
 
 
             //Export challenge unityPackage
-            AssetDatabase.ExportPackage(contentPath, $"{path}{pack.name}.unitypackage", ExportPackageOptions.Recurse);
+            AssetDatabase.ExportPackage(contentPath, $"{directory}{pack.name}.unitypackage", ExportPackageOptions.Recurse);
 
 
             //Export challenge infos
             ChallengeInfo infos = new ChallengeInfo(pack);
             string jsonFile = JsonUtility.ToJson(infos, true);
-            File.WriteAllText($"{path}{pack.name}.json", jsonFile);
+            File.WriteAllText($"{directory}{pack.name}.json", jsonFile);
 
 
             //Export challenge preview
@@ -1129,7 +1205,7 @@ namespace Challenges
             {
                 //Copy image
                 string imgSource = AssetDatabase.GetAssetPath(pack.preview);
-                string imgDest = $"{path}{pack.name}.jpg";
+                string imgDest = $"{directory}{pack.name}.jpg";
                 Texture2D tex = new Texture2D(2, 2);
                 tex.LoadImage(File.ReadAllBytes(imgSource));
                 File.WriteAllBytes(imgDest, tex.EncodeToJPG());
