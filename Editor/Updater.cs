@@ -8,7 +8,6 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
-using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
@@ -23,6 +22,7 @@ namespace Challenges
 
         public const string gitOwner = "Niwala";
         public const string gitRepo = "Challenges";
+        public static string gitUpdaterUrl = $@"https://github.com/{gitOwner}/ChallengesUpdater.git";
         public static string gitDownloadUrl = @$"https://raw.githubusercontent.com//{gitOwner}/{gitRepo}/main";
         public static string gitContentUrl = @$"https://api.github.com/repos/{gitOwner}/{gitRepo}/contents";
         public static string gitBlobUrl = @$"https://github.com/{gitOwner}/{gitRepo}/blob/main";
@@ -95,50 +95,28 @@ namespace Challenges
             LoadResources();
             LoadCache();
 
-            string filePath = GetFilePath().Replace('\\', '/');
-            bool pluginIsInPackage = !filePath.StartsWith(Application.dataPath);
-            Debug.Log(pluginIsInPackage);
-
-            if (pluginIsInPackage)
-            {
-                AddRequest addRequest = Client.Add("https://github.com/Niwala/ChallengesUpdater.git");
-                LogRequest(addRequest);
-            }
-
-            //UnityPackage updaterPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-
-            //if (updaterPackage != null)
-            //{
-            //    Debug.Log("Start search on id " + updaterPackage.packageId);
-            //    SearchRequest request = Client.Search(updaterPackage.packageId, false);
-            //    EditorApplication.delayCall += () => LogRequest(request);
-            //}
-        }
-
-        private void LogRequest(AddRequest request)
-        {
-            if (request.IsCompleted)
-            {
-                Debug.Log("Error : " + request.Error?.errorCode + "  " + request.Error?.message);
-                Debug.Log("IsCompleted : " + request.IsCompleted);
-                //Debug.Log("PackageIdOrName : " + request.PackageIdOrName);
-                //Debug.Log("Result : " + request.Result?.Length);
-                //for (int i = 0; i < request.Result?.Length; i++)
-                //{
-                //    Debug.Log("  " + request.Result[i].displayName);
-                //}
-
-                Debug.Log("Status : " + request.Status);
-            }
-            else
-            {
-                EditorApplication.delayCall += () => LogRequest(request);
-            }
+            //Check updater version
+            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+            Debug.Log(currentPackage.version);
         }
 
         private void OnDisable()
         {
             DestroyImmediate(target);
+        }
+
+        private static void UpdateTheChallengeUpdater()
+        {
+            //Check if the plugin exist in package (and not in the project assets)
+            string filePath = GetFilePath().Replace('\\', '/');
+            bool pluginIsInPackage = !filePath.StartsWith(Application.dataPath);
+
+            //We don't want to add the package if the plugin is present in the Assets
+            if (!pluginIsInPackage)
+                return;
+
+            //Send the request to the package manager 
+            Client.Add(Updater.gitUpdaterUrl);
         }
 
         private static void LoadResources()
