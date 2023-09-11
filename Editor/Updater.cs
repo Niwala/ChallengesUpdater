@@ -10,16 +10,16 @@ using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using UnityEditor.SceneManagement;
 using UnityEditor.PackageManager;
+using System.Diagnostics;
 using UnityEditor.PackageManager.Requests;
 using System.Runtime.CompilerServices;
 using UnityPackage = UnityEditor.PackageManager.PackageInfo;
+using Debug = UnityEngine.Debug;
 
 namespace Challenges
 {
     public class Updater : ScriptableObject
     {
-        public const int projectVersion = 13;
-
         public const string gitOwner = "Niwala";
         public const string gitRepo = "Challenges";
         public static string gitUpdaterUrl = $@"https://github.com/{gitOwner}/ChallengesUpdater.git";
@@ -96,8 +96,7 @@ namespace Challenges
             LoadCache();
 
             //Check updater version
-            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-            Debug.Log(currentPackage.version);
+            ChallengesUpdaterIsOutdated((bool b) => Debug.Log("Outdated : " + b));
         }
 
         private void OnDisable()
@@ -105,7 +104,63 @@ namespace Challenges
             DestroyImmediate(target);
         }
 
-        private static void UpdateTheChallengeUpdater()
+        private static void DownloadUpdaterIndex(System.Action<UpdaterInfo> onUpdaterIndexDownloaded)
+        {
+            //Set loading status
+            updaterStatus = UpdaterStatus.Loading;
+
+            //Download project infos
+            string uri = $"{Updater.gitDownloadUrl}/Index.json";
+            DownloadFile(uri, (DownloadHandler handler) =>
+            {
+                if (onUpdaterIndexDownloaded != null)
+                    onUpdaterIndexDownloaded.Invoke(JsonUtility.FromJson<UpdaterInfo>(handler.text));
+            });
+        }
+
+        private static void ChallengesUpdaterIsOutdated(System.Action<bool> outdated)
+        {
+            //Check updater version
+            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+
+            //The plugin exist in the assets and not the package manager.
+            //So it should always be up to date or updated by git and not the package manager.
+            if (currentPackage == null)
+            {
+                outdated.Invoke(false);
+                return;
+            }
+
+            //We need to download the index to find out the latest version of the plugin.
+            DownloadUpdaterIndex(OnUpdaterIndexDownloaded);
+
+            void OnUpdaterIndexDownloaded(UpdaterInfo updaterInfo)
+            {
+                Debug.Log("Online version : " + updaterInfo.version);
+                Debug.Log("Package version : " + currentPackage.version);
+
+                outdated.Invoke(updaterInfo.version != currentPackage.version);
+            }
+        }
+
+        public static UnityPackage GetCurrentPackage()
+        {
+            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+
+            //If the plugin exist in assets file, currentPackage should be null -> Build a new instance from json file
+            if (currentPackage == null)
+            {
+                string filePath = GetFilePath();
+                filePath.Replace("Editor/Updater.cs", "package.json");
+                UnityPackage packageInfo = default;
+                JsonUtility.FromJsonOverwrite(File.ReadAllText(filePath), packageInfo);
+                return currentPackage;
+            }
+
+            return currentPackage;
+        }
+
+        private static void UpdateTheChallengesUpdater()
         {
             //Check if the plugin exist in package (and not in the project assets)
             string filePath = GetFilePath().Replace('\\', '/');
@@ -254,11 +309,11 @@ namespace Challenges
                 GenericMenu menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Refresh"), false, () => { UpdateCache(); });
                 if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Generate Index File"), false, () => { GenerateIndexFile(); });
+                    menu.AddItem(new GUIContent("Generate Index File"), false, () => { GenerateUpdaterInfo(false); });
                 if (Event.current.shift)
                     menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
                 if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateIndexFile(); ExportAllChallenges(); });
+                    menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateUpdaterInfo(false); ExportAllChallenges(); });
 
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Auto Select"), autoSelect, () => { TutoPack_Selector.ToggleAutoSelect(); });
@@ -544,17 +599,31 @@ namespace Challenges
             }
         }
 
-        private void DownloadChallenge(string name, bool manualImport = false)
-        {
-            DowloadPackage($"{Updater.gitDownloadUrl}/Challenges/{name}.unitypackage", manualImport);
-        }
-
         private void UpdateProject()
         {
-            DowloadPackage($"{Updater.gitDownloadUrl}/Project/Project.unitypackage", false);
+            DownloadPackage($"{Updater.gitDownloadUrl}/Project/Project.unitypackage", false);
         }
 
-        private void DowloadPackage(string uri, bool manualImport = false)
+        private static void DownloadFile(string uri, System.Action<DownloadHandler> callback)
+        {
+            UnityWebRequest request = UnityWebRequest.Get(uri);
+            request.SetRequestHeader("authorization", Updater.gitToken);
+            request.SendWebRequest().completed += WebRequestCompleted;
+
+            void WebRequestCompleted(AsyncOperation obj)
+            {
+                UnityWebRequest request = (obj as UnityWebRequestAsyncOperation).webRequest;
+
+                if (LogErrorIfAny(request))
+                    return;
+
+                string[] pages = uri.Split('/');
+                int page = pages.Length - 1;
+                callback.Invoke(request.downloadHandler);
+            }
+        }
+
+        private void DownloadPackage(string uri, bool manualImport = false)
         {
             DownloadFile(uri, (DownloadHandler handler) =>
             {
@@ -568,6 +637,11 @@ namespace Challenges
                 AssetDatabase.importPackageCancelled += ImportPackageCancelled;
                 AssetDatabase.ImportPackage(path + "Challenge.unitypackage", manualImport);
             });
+        }
+
+        private void DownloadChallenge(string name, bool manualImport = false)
+        {
+            DownloadPackage($"{Updater.gitDownloadUrl}/Challenges/{name}.unitypackage", manualImport);
         }
 
         private void ImportPackageCompleted(string packageName)
@@ -646,20 +720,61 @@ namespace Challenges
                 FirstOrDefault(x => x.name == name));
         }
 
-        private void GenerateIndexFile()
+        private void GenerateUpdaterInfo(bool incrementVersion)
         {
-            string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
-            List<TutoPack> packs = tutoPackGUIDs.ToList().
-                Select(x => AssetDatabase.LoadAssetAtPath<TutoPack>(AssetDatabase.GUIDToAssetPath(x))).
-                Where(x => x != null).ToList();
+            //Load info from package json file (Unity formating)
+            string filePath = GetFilePath();
+            filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
+            UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
 
-            ChallengeInfo[] infos = packs.ToList().Select(x => new ChallengeInfo(x)).ToArray();
-            string file = JsonUtility.ToJson(ProjectInfo.CurrentProjectInfo, true);
 
-            string directory = Application.dataPath.Remove(Application.dataPath.Length - 6) + "../Repository/";
+            //Write simplified version in the repository
+            string file = JsonUtility.ToJson(updaterInfo, true);
+            string directory = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
             File.WriteAllText(directory + "Index.json", file);
+
+
+            //Publish the new updater version
+            {
+                Process cmd = new Process();
+                ProcessStartInfo info = new ProcessStartInfo();
+                info.FileName = "cmd.exe";
+                info.RedirectStandardInput = true;
+                info.RedirectStandardOutput = true;
+                info.UseShellExecute = false;
+                info.CreateNoWindow = true;
+                info.WindowStyle = ProcessWindowStyle.Hidden;
+                info.WorkingDirectory = directory;
+
+                cmd.StartInfo = info;
+                cmd.Start();
+
+                using (StreamWriter sw = cmd.StandardInput)
+                {
+                    if (sw.BaseStream.CanWrite)
+                    {
+                        sw.WriteLine($"Publish updater");
+
+                        string[] files = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
+                        for (int i = 0; i < files.Length; i++)
+                        {
+                            if (files[i].Contains("\\Challenges\\") ||files[i].Contains(".git"))
+                                continue;
+
+                            sw.WriteLine($"git add {files[i]}");
+                        }
+
+                        sw.WriteLine($"git status");
+                        sw.WriteLine($"git commit -am \"Publish Updater\"");
+                        sw.WriteLine($"git push origin main");
+                    }
+                }
+
+                cmd.WaitForExit();
+                Debug.Log(cmd.StandardOutput.ReadToEnd());
+            }
         }
 
         private void GenerateReadme()
@@ -709,14 +824,14 @@ namespace Challenges
 
 
             //Check project update
-            ProjectInfo projectInfo = default;
-            if (File.Exists($"{cacheDir}/UpdaterInfo.json"))
-            {
-                string projectInfoFile = File.ReadAllText($"{cacheDir}/UpdaterInfo.json");
-                projectInfo = JsonUtility.FromJson<ProjectInfo>(projectInfoFile);
-            }
-            if (projectInfo.projectVersion > Updater.projectVersion)
-                updaterStatus = UpdaterStatus.Outdated;
+            //UpdaterInfo projectInfo = default;
+            //if (File.Exists($"{cacheDir}/UpdaterInfo.json"))
+            //{
+            //    string projectInfoFile = File.ReadAllText($"{cacheDir}/UpdaterInfo.json");
+            //    projectInfo = JsonUtility.FromJson<UpdaterInfo>(projectInfoFile);
+            //}
+            //if (projectInfo.version > Updater.projectVersion)
+            //    updaterStatus = UpdaterStatus.Outdated;
 
 
             //Read all challenge infos
@@ -799,7 +914,7 @@ namespace Challenges
             string uri = $"{Updater.gitDownloadUrl}/Index.json";
             DownloadFile(uri, (DownloadHandler handler) =>
             {
-                ProjectInfo projectInfo = JsonUtility.FromJson<ProjectInfo>(handler.text);
+                UpdaterInfo projectInfo = JsonUtility.FromJson<UpdaterInfo>(handler.text);
                 string file = JsonUtility.ToJson(projectInfo);
                 File.WriteAllText($"{cacheDir}/UpdaterInfo.json", file);
 
@@ -924,25 +1039,6 @@ namespace Challenges
             }
         }
 
-        private void DownloadFile(string uri, System.Action<DownloadHandler> callback)
-        {
-            UnityWebRequest request = UnityWebRequest.Get(uri);
-            request.SetRequestHeader("authorization", Updater.gitToken);
-            request.SendWebRequest().completed += WebRequestCompleted;
-
-            void WebRequestCompleted(AsyncOperation obj)
-            {
-                UnityWebRequest request = (obj as UnityWebRequestAsyncOperation).webRequest;
-
-                if (LogErrorIfAny(request))
-                    return;
-
-                string[] pages = uri.Split('/');
-                int page = pages.Length - 1;
-                callback.Invoke(request.downloadHandler);
-            }
-        }
-
         private struct Status
         {
             public TutoPack pack;
@@ -1021,19 +1117,9 @@ namespace Challenges
         }
 
         [System.Serializable]
-        public struct ProjectInfo
+        public struct UpdaterInfo
         {
-            public int projectVersion;
-
-            public static ProjectInfo CurrentProjectInfo
-            {
-                get
-                {
-                    ProjectInfo info = default;
-                    info.projectVersion = Updater.projectVersion;
-                    return info;
-                }
-            }
+            public string version;
         }
 
         [System.Serializable]
@@ -1088,7 +1174,7 @@ namespace Challenges
             public T[] array;
         }
 
-        private bool LogErrorIfAny(UnityWebRequest request)
+        private static bool LogErrorIfAny(UnityWebRequest request)
         {
             switch (request.result)
             {

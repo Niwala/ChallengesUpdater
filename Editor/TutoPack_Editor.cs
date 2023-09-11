@@ -500,7 +500,7 @@ namespace Challenges
                     report += $"\nUsername : {username}";
                     report += $"\nCurrent scene : {EditorSceneManager.GetActiveScene().name}";
                     report += $"\nChallenge Hash : {pack.hash}";
-                    report += $"\nUpdater Version : {Updater.projectVersion}";
+                    report += $"\nUpdater Version : {Updater_Editor.GetCurrentPackage().version}";
                     report += $"\nCurrent page : {page}```";
                     Embed embed = new Embed("Error report", report, Color.red);
                     return embed;
@@ -573,7 +573,7 @@ namespace Challenges
             report += $"\nUnity account : {CloudProjectSettings.userName}";
             report += $"\nCurrent scene : {EditorSceneManager.GetActiveScene().name}";
             report += $"\nChallenge Hash : {pack.hash}";
-            report += $"\nUpdater Version : {Updater.projectVersion}";
+            report += $"\nUpdater Version : {Updater_Editor.GetCurrentPackage().version}";
             report += $"\nCurrent page : {page}```";
 
             //Send rating msg
