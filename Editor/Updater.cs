@@ -85,6 +85,9 @@ namespace Challenges
 
         private string cacheDir { get => "Temp/ChallengesUpdater"; }
 
+        private static string onlineVersion;
+        private static string localVersion;
+
 
         //Ressources
 
@@ -102,21 +105,12 @@ namespace Challenges
             DestroyImmediate(target);
         }
 
-        public static UnityPackage GetCurrentPackage()
+        public static UpdaterInfo GetCurrentPackage()
         {
-            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-
-            //If the plugin exist in assets file, currentPackage should be null -> Build a new instance from json file
-            if (currentPackage == null)
-            {
-                string filePath = GetFilePath();
-                filePath.Replace("Editor/Updater.cs", "package.json");
-                UnityPackage packageInfo = default;
-                JsonUtility.FromJsonOverwrite(File.ReadAllText(filePath), packageInfo);
-                return currentPackage;
-            }
-
-            return currentPackage;
+            string filePath = GetFilePath();
+            filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
+            UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
+            return updaterInfo;
         }
 
         public static void CheckUpdaterVersion()
@@ -183,15 +177,18 @@ namespace Challenges
             //So it should always be up to date or updated by git and not the package manager.
             if (currentPackage == null)
             {
+                localVersion = GetCurrentPackage().version;
                 outdated.Invoke(false);
                 return;
             }
+            localVersion = currentPackage.version;
 
             //We need to download the index to find out the latest version of the plugin.
             DownloadUpdaterIndex(OnUpdaterIndexDownloaded);
 
             void OnUpdaterIndexDownloaded(UpdaterInfo updaterInfo)
             {
+                onlineVersion = updaterInfo.version.ToString();
                 bool b = updaterInfo.version.ToString() != currentPackage.version;
                 if (b)
                 {
@@ -211,10 +208,15 @@ namespace Challenges
 
             //We don't want to add the package if the plugin is present in the Assets
             if (!pluginIsInPackage)
+            {
+                Debug.LogError("The plugin is not recognised as a package, and therefore cannot be updated.");
                 return;
+            }
 
             //Send the request to the package manager 
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Downloading the package...", 0.0f);
             Client.Add(Updater.gitUpdaterUrl);
+            EditorUtility.ClearProgressBar();
         }
 
         private static void LoadResources()
@@ -399,7 +401,7 @@ namespace Challenges
             }
 
             Rect titleRect = new Rect(rect.x + 40, rect.y + 10, rect.width - 10, 26);
-            Rect descriptionRect = new Rect(rect.x + 5, rect.y + 40, rect.width - 100, rect.height - 40);
+            Rect descriptionRect = new Rect(rect.x + 12, rect.y + 40, rect.width - 100, rect.height - 40);
             Rect buttonRect = new Rect(rect.x + rect.width - 90, rect.y + rect.height - 25, 85, 20);
 
             switch (updaterStatus)
@@ -411,7 +413,8 @@ namespace Challenges
 
                     EditorGUI.HelpBox(rect, "", MessageType.None);
                     GUI.Label(titleRect, "Updater", titleStyle);
-                    if (GUI.Button(buttonRect, "Update the challenges"))
+                    GUI.Label(descriptionRect, localVersion, descriptionStyle);
+                    if (GUI.Button(buttonRect, "Check updates"))
                     {
                         CheckUpdaterVersion();
                         UpdateCache();
