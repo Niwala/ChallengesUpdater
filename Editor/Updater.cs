@@ -739,7 +739,7 @@ namespace Challenges
                 string[] parts = version.Split('.');
                 int revision = int.Parse(parts[2]);
                 revision++;
-                version = $"{parts[0]}.{parts[1]}.{revision.ToString("D3")}";
+                version = $"{parts[0]}.{parts[1]}.{revision}";
                 updaterInfo.version = version;
 
                 File.WriteAllText(filePath, JsonUtility.ToJson(updaterInfo, true));
