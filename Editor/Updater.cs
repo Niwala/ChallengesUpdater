@@ -355,7 +355,8 @@ namespace Challenges
                     menu.AddSeparator("");
                     menu.AddDisabledItem(new GUIContent("⠀"));
                     menu.AddDisabledItem(new GUIContent("Dev area"));
-                    menu.AddItem(new GUIContent("Export new version of the Updater"), false, () => { GenerateUpdaterInfo(true); });
+                    menu.AddItem(new GUIContent("Export current Updater version"), false, () => { GenerateUpdaterInfo(false); });
+                    menu.AddItem(new GUIContent("Export a new Updater version"), false, () => { GenerateUpdaterInfo(true); });
                     menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
                     menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateUpdaterInfo(false); ExportAllChallenges(); });
                 }
