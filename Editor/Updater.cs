@@ -789,6 +789,7 @@ namespace Challenges
 
 
             //Publish the new updater version
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Push the Updater files", 0.0f);
             string updaterWorkspace = new DirectoryInfo(GetFilePath()).Parent.FullName;
             string[] updaterFiles = Directory.GetFiles(updaterWorkspace, "*", SearchOption.AllDirectories).
                 Where(x => !x.Contains("\\Challenges\\") && !x.Contains(".git")).ToArray();
@@ -796,8 +797,11 @@ namespace Challenges
 
 
             //Publish the new index
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Publish the new index", 0.5f);
             string challengesWorkspace = new DirectoryInfo(indexPath).FullName;
             SendGitFiles(challengesWorkspace, indexPath);
+
+            EditorUtility.ClearProgressBar();
         }
 
         private void GenerateReadme()
