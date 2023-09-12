@@ -189,14 +189,14 @@ namespace Challenges
             void OnUpdaterIndexDownloaded(UpdaterInfo updaterInfo)
             {
                 onlineVersion = updaterInfo.version.ToString();
-                bool b = updaterInfo.version.ToString() != currentPackage.version;
-                if (b)
+                bool isOutdated = OutDated(localVersion, onlineVersion);
+                if (isOutdated)
                 {
                     Debug.Log($"the Challenges Updater package version differs from the online version\n" +
                         $"Online Version : {updaterInfo.version}\n" +
                         $"Package Version : {currentPackage.version}");
                 }
-                outdated.Invoke(b);
+                outdated.Invoke(isOutdated);
             }
         }
 
@@ -443,7 +443,7 @@ namespace Challenges
                 case UpdaterStatus.Outdated:
                     EditorGUI.HelpBox(rect, "", MessageType.Warning);
                     GUI.Label(titleRect, "Update available", titleStyle);
-                    GUI.Label(descriptionRect, "(Does not influence the challenges)", descriptionStyle);
+                    GUI.Label(descriptionRect, $"Local : {localVersion} Online : {onlineVersion}\n(Does not influence the challenges)", descriptionStyle);
                     if (GUI.Button(buttonRect, "Apply"))
                         UpdateTheUpdater();
                     break;
@@ -456,6 +456,17 @@ namespace Challenges
                         UpdateCache();
                     break;
             }
+        }
+
+        public static bool OutDated(string localVersion, string onlineVersion)
+        {
+            string[] lv = localVersion.Split('.');
+            string[] ov = onlineVersion.Split('.');
+
+            for (int i = 0; i < 3; i++)
+                if (int.Parse(lv[i]) < int.Parse(ov[i]))
+                    return true;
+            return false;
         }
 
         private void DrawChallengeGUI(Status status)
