@@ -747,15 +747,15 @@ namespace Challenges
 
             //Write simplified version in the challenges repository
             string file = JsonUtility.ToJson(updaterInfo, true);
-            string directory = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
-            if (!Directory.Exists(directory))
-                Directory.CreateDirectory(directory);
-            File.WriteAllText(directory + "Index.json", file);
+            string indexDirectory = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
+            if (!Directory.Exists(indexDirectory))
+                Directory.CreateDirectory(indexDirectory);
+            File.WriteAllText(indexDirectory + "Index.json", file);
 
 
             //Publish the new updater version
-            directory = new DirectoryInfo(GetFilePath()).Parent.FullName;
             {
+                string directory = new DirectoryInfo(GetFilePath()).Parent.FullName;
                 Process cmd = new Process();
                 ProcessStartInfo info = new ProcessStartInfo();
                 info.FileName = "cmd.exe";
@@ -773,8 +773,6 @@ namespace Challenges
                 {
                     if (sw.BaseStream.CanWrite)
                     {
-                        sw.WriteLine($"Publish updater");
-
                         string[] files = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
                         for (int i = 0; i < files.Length; i++)
                         {
@@ -791,7 +789,42 @@ namespace Challenges
                 }
 
                 cmd.WaitForExit();
-                Debug.Log(cmd.StandardOutput.ReadToEnd());
+                Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
+            }
+
+            //Publish the new index
+            {
+                Process cmd = new Process();
+                ProcessStartInfo info = new ProcessStartInfo();
+                info.FileName = "cmd.exe";
+                info.RedirectStandardInput = true;
+                info.RedirectStandardOutput = true;
+                info.UseShellExecute = false;
+                info.CreateNoWindow = true;
+                info.WindowStyle = ProcessWindowStyle.Hidden;
+                info.WorkingDirectory = indexDirectory;
+
+                cmd.StartInfo = info;
+                cmd.Start();
+
+                using (StreamWriter sw = cmd.StandardInput)
+                {
+                    if (sw.BaseStream.CanWrite)
+                    {
+                        sw.WriteLine($"git checkout main");
+                        sw.WriteLine($"git fetch origin main");
+                        sw.WriteLine($"git rebase -i origin/main");
+
+                        sw.WriteLine($"git add {indexDirectory}");
+
+                        sw.WriteLine($"git status");
+                        sw.WriteLine($"git commit -am \"Publish Updater Index\"");
+                        sw.WriteLine($"git push origin main");
+                    }
+                }
+
+                cmd.WaitForExit();
+                Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
             }
         }
 
