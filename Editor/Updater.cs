@@ -728,7 +728,7 @@ namespace Challenges
             UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
 
 
-            //Write simplified version in the repository
+            //Write simplified version in the challenges repository
             string file = JsonUtility.ToJson(updaterInfo, true);
             string directory = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
             if (!Directory.Exists(directory))
@@ -737,6 +737,13 @@ namespace Challenges
 
 
             //Publish the new updater version
+            directory = new DirectoryInfo(GetFilePath()).Parent.FullName;
+            if (!directory.Contains("\\Assets\\"))
+            {
+                Debug.LogWarning("The plugin in package form is not authorised to send new versions.");
+                return;
+            }
+
             {
                 Process cmd = new Process();
                 ProcessStartInfo info = new ProcessStartInfo();
