@@ -139,7 +139,7 @@ namespace Challenges
                 Debug.Log("Online version : " + updaterInfo.version);
                 Debug.Log("Package version : " + currentPackage.version);
 
-                outdated.Invoke(updaterInfo.version != currentPackage.version);
+                outdated.Invoke(updaterInfo.version.ToString() != currentPackage.version);
             }
         }
 
@@ -729,18 +729,17 @@ namespace Challenges
                 Debug.LogWarning("The plugin in package form is not authorised to send new versions.");
                 return;
             }
-
-
             filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
             UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
 
+            //Auto increment patch version if needed
             if (incrementVersion)
             {
                 string version = updaterInfo.version;
                 string[] parts = version.Split('.');
                 int revision = int.Parse(parts[2]);
                 revision++;
-                version = $"{parts[0]}.{parts[1]}.{revision.ToString("000")}";
+                version = $"{parts[0]}.{parts[1]}.{revision.ToString("D3")}";
                 updaterInfo.version = version;
 
                 File.WriteAllText(filePath, JsonUtility.ToJson(updaterInfo, true));
