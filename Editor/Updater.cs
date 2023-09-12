@@ -309,7 +309,7 @@ namespace Challenges
                 GenericMenu menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Refresh"), false, () => { UpdateCache(); });
                 if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Generate Index File"), false, () => { GenerateUpdaterInfo(false); });
+                    menu.AddItem(new GUIContent("Export new version of the Updater"), false, () => { GenerateUpdaterInfo(true); });
                 if (Event.current.shift)
                     menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
                 if (Event.current.shift)
@@ -724,9 +724,27 @@ namespace Challenges
         {
             //Load info from package json file (Unity formating)
             string filePath = GetFilePath();
+            if (!filePath.Contains("\\Assets\\"))
+            {
+                Debug.LogWarning("The plugin in package form is not authorised to send new versions.");
+                return;
+            }
+
+
             filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
             UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
 
+            if (incrementVersion)
+            {
+                string version = updaterInfo.version;
+                string[] parts = version.Split('.');
+                int revision = int.Parse(parts[2]);
+                revision++;
+                version = $"{parts[0]}.{parts[1]}.{revision.ToString("000")}";
+                updaterInfo.version = version;
+
+                File.WriteAllText(filePath, JsonUtility.ToJson(updaterInfo, true));
+            }
 
             //Write simplified version in the challenges repository
             string file = JsonUtility.ToJson(updaterInfo, true);
@@ -738,12 +756,6 @@ namespace Challenges
 
             //Publish the new updater version
             directory = new DirectoryInfo(GetFilePath()).Parent.FullName;
-            if (!directory.Contains("\\Assets\\"))
-            {
-                Debug.LogWarning("The plugin in package form is not authorised to send new versions.");
-                return;
-            }
-
             {
                 Process cmd = new Process();
                 ProcessStartInfo info = new ProcessStartInfo();
@@ -1126,7 +1138,20 @@ namespace Challenges
         [System.Serializable]
         public struct UpdaterInfo
         {
+            public string name;
+            public string displayName;
             public string version;
+            public string unity;
+            public string description;
+            public AuthorInfo author;
+        }
+
+        [System.Serializable]
+        public struct AuthorInfo
+        {
+            public string name;
+            public string email;
+            public string url;
         }
 
         [System.Serializable]

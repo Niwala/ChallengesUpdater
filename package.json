@@ -1,12 +1,12 @@
 {
-  "name": "com.niwala.challengesupdater",
-  "displayName": "Challenges Updater",
-  "version": "0.1.3",
-  "unity": "2022.2",
-  "description": "A series of TechArt challenges for students of the Haute Ecole Albert Jacquard.",
-  "author": {
-    "name": "Samuel Jemine",
-    "email": "samuel.jemine@heaj.be",
-    "url": "https://github.com/Niwala"
-  }
+    "name": "com.niwala.challengesupdater",
+    "displayName": "Challenges Updater",
+    "version": "0.1.005",
+    "unity": "2022.2",
+    "description": "A series of TechArt challenges for students of the Haute Ecole Albert Jacquard.",
+    "author": {
+        "name": "Samuel Jemine",
+        "email": "samuel.jemine@heaj.be",
+        "url": "https://github.com/Niwala"
+    }
 }
