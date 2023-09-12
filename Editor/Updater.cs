@@ -142,9 +142,9 @@ namespace Challenges
             {
                 if (sw.BaseStream.CanWrite)
                 {
-                    sw.WriteLine($"git checkout main");
-                    sw.WriteLine($"git fetch origin main");
-                    sw.WriteLine($"git rebase -i origin/main");
+                    //sw.WriteLine($"git checkout main");
+                    //sw.WriteLine($"git fetch origin main");
+                    //sw.WriteLine($"git rebase -i origin/main");
 
                     for (int i = 0; i < files.Length; i++)
                         sw.WriteLine($"git add {files[i]}");
