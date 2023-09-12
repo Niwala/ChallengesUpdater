@@ -1,4 +1,4 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Reflection;
 using System.IO;
 using System.Collections.Generic;
@@ -96,7 +96,9 @@ namespace Challenges
             LoadCache();
 
             //Check updater version
-            ChallengesUpdaterIsOutdated((bool b) => Debug.Log("Outdated : " + b));
+            ChallengesUpdaterIsOutdated((bool b) => { if (b) { updaterStatus = UpdaterStatus.Outdated; } });
+
+            
         }
 
         private void OnDisable()
@@ -196,7 +198,7 @@ namespace Challenges
             }
         }
 
-        private static void UpdateTheChallengesUpdater()
+        private static void UpdateTheUpdater()
         {
             //Check if the plugin exist in package (and not in the project assets)
             string filePath = GetFilePath().Replace('\\', '/');
@@ -291,7 +293,7 @@ namespace Challenges
 
             //Teacher
             Rect rect = GUILayoutUtility.GetRect(200, EditorGUIUtility.singleLineHeight);
-            string teacherContent = string.IsNullOrEmpty(teacher) ? "Teacher : All" : $"Teacher : {teacher.Replace("/", " › ")}";
+            string teacherContent = string.IsNullOrEmpty(teacher) ? "Teacher : All" : $"Teacher : {teacher.Replace("/", " â€º ")}";
 
             if (GUI.Button(rect, teacherContent, EditorStyles.toolbarDropDown))
             {
@@ -344,15 +346,20 @@ namespace Challenges
 
                 GenericMenu menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Refresh"), false, () => { UpdateCache(); });
-                if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Export new version of the Updater"), false, () => { GenerateUpdaterInfo(true); });
-                if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
-                if (Event.current.shift)
-                    menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateUpdaterInfo(false); ExportAllChallenges(); });
 
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Auto Select"), autoSelect, () => { TutoPack_Selector.ToggleAutoSelect(); });
+
+                if (Event.current.shift)
+                {
+                    menu.AddSeparator("");
+                    menu.AddDisabledItem(new GUIContent("â €"));
+                    menu.AddDisabledItem(new GUIContent("Dev area"));
+                    menu.AddItem(new GUIContent("Export new version of the Updater"), false, () => { GenerateUpdaterInfo(true); });
+                    menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
+                    menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateUpdaterInfo(false); ExportAllChallenges(); });
+                }
+
                 menu.DropDown(rect);
             }
             GUILayout.EndHorizontal();
@@ -411,7 +418,7 @@ namespace Challenges
 
                     EditorGUI.HelpBox(rect, "", MessageType.None);
                     GUI.Label(titleRect, "Updater", titleStyle);
-                    if (GUI.Button(buttonRect, "Vérifier les mises à jour"))
+                    if (GUI.Button(buttonRect, "VÃ©rifier les mises Ã  jour"))
                         UpdateCache();
                     break;
 
@@ -436,10 +443,10 @@ namespace Challenges
 
                 case UpdaterStatus.Outdated:
                     EditorGUI.HelpBox(rect, "", MessageType.Warning);
-                    GUI.Label(titleRect, "Mise à jour disponible", titleStyle);
+                    GUI.Label(titleRect, "Mise Ã  jour disponible", titleStyle);
                     GUI.Label(descriptionRect, "N'influence pas les challenges", descriptionStyle);
                     if (GUI.Button(buttonRect, "Appliquer"))
-                        UpdateProject();
+                        UpdateTheUpdater();
                     break;
 
                 case UpdaterStatus.Error:
@@ -635,11 +642,6 @@ namespace Challenges
             }
         }
 
-        private void UpdateProject()
-        {
-            DownloadPackage($"{Updater.gitDownloadUrl}/Project/Project.unitypackage", false);
-        }
-
         private static void DownloadFile(string uri, System.Action<DownloadHandler> callback)
         {
             UnityWebRequest request = UnityWebRequest.Get(uri);
@@ -769,7 +771,7 @@ namespace Challenges
             UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
 
 
-            //Auto increment patch version if needed
+            //Update package index if needed
             if (incrementVersion)
             {
                 string version = updaterInfo.version;
@@ -782,7 +784,7 @@ namespace Challenges
             }
 
 
-            //Write simplified version in the challenges repository
+            //Update package info in the challenges repository
             string file = JsonUtility.ToJson(updaterInfo, true);
             string indexPath = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
             if (!Directory.Exists(indexPath))

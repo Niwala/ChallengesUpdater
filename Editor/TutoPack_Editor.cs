@@ -1,4 +1,4 @@
-using System.Linq;
+ï»¿using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -211,6 +211,8 @@ namespace Challenges
                 if (Event.current.shift)
                 {
                     menu.AddSeparator("");
+                    menu.AddDisabledItem(new GUIContent("â €"));
+                    menu.AddDisabledItem(new GUIContent("Dev area"));
                     menu.AddItem(new GUIContent("Edit"), false, () => { editTuto = !editTuto; });
                     menu.AddItem(new GUIContent("Publish"), false, () => { PublisherInfoEditor.Open(OnPublish); });
                 }
@@ -392,7 +394,7 @@ namespace Challenges
             EditorGUILayout.SelectableLabel("<b>Bold</b>");
             EditorGUILayout.SelectableLabel("<i>Itallic</i>");
             EditorGUILayout.SelectableLabel("<size=16>Big text</size>");
-            EditorGUILayout.SelectableLabel("•  \u25B7  \u25B6  —  \u25E6  \u2023  \u29BF  \u29BE  \u25AA  \u25C9  \u2649");
+            EditorGUILayout.SelectableLabel("â€¢  \u25B7  \u25B6  â€”  \u25E6  \u2023  \u29BF  \u29BE  \u25AA  \u25C9  \u2649");
             EditorGUILayout.SelectableLabel("Link : LinkName|LinkAdress");
             EditorGUILayout.SelectableLabel("Shader : Empty text = Square      Int value = Height of the preview");
             EditorGUILayout.EndVertical();
@@ -1373,10 +1375,10 @@ namespace Challenges
                 if (string.IsNullOrEmpty(username))
                     GUI.Label(GUILayoutUtility.GetLastRect(), "(Pseudo Discord ou Mail)", EditorStyles.centeredGreyMiniLabel);
 
-                GUILayout.Label("Description du problème");
+                GUILayout.Label("Description du problÃ¨me");
                 description = EditorGUILayout.TextArea(description, GUILayout.ExpandHeight(true));
 
-                EditorGUILayout.HelpBox("En cliquant sur Send, vous acceptez que ce message soit envoyé à un professeur avec des infos d'Unity, tel que des screenshots et logs.", MessageType.None);
+                EditorGUILayout.HelpBox("En cliquant sur Send, vous acceptez que ce message soit envoyÃ© Ã  un professeur avec des infos d'Unity, tel que des screenshots et logs.", MessageType.None);
 
                 if (GUILayout.Button("Screenshot inclus", EditorStyles.toolbarDropDown))
                 {
