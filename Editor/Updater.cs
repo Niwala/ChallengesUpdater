@@ -798,7 +798,7 @@ namespace Challenges
 
 
             //Publish the new index
-            string challengesWorkspace = new DirectoryInfo(indexPath).Parent.FullName;
+            string challengesWorkspace = new DirectoryInfo(indexPath).FullName;
             SendGitFiles(challengesWorkspace, indexPath);
         }
 
