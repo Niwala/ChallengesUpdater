@@ -104,6 +104,59 @@ namespace Challenges
             DestroyImmediate(target);
         }
 
+        public static UnityPackage GetCurrentPackage()
+        {
+            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+
+            //If the plugin exist in assets file, currentPackage should be null -> Build a new instance from json file
+            if (currentPackage == null)
+            {
+                string filePath = GetFilePath();
+                filePath.Replace("Editor/Updater.cs", "package.json");
+                UnityPackage packageInfo = default;
+                JsonUtility.FromJsonOverwrite(File.ReadAllText(filePath), packageInfo);
+                return currentPackage;
+            }
+
+            return currentPackage;
+        }
+
+        public static void SendGitFiles(string workspace, params string[] files)
+        {
+            Process cmd = new Process();
+            ProcessStartInfo info = new ProcessStartInfo();
+            info.FileName = "cmd.exe";
+            info.RedirectStandardInput = true;
+            info.RedirectStandardOutput = true;
+            info.UseShellExecute = false;
+            info.CreateNoWindow = true;
+            info.WindowStyle = ProcessWindowStyle.Hidden;
+            info.WorkingDirectory = workspace;
+
+            cmd.StartInfo = info;
+            cmd.Start();
+
+            using (StreamWriter sw = cmd.StandardInput)
+            {
+                if (sw.BaseStream.CanWrite)
+                {
+                    sw.WriteLine($"git checkout main");
+                    sw.WriteLine($"git fetch origin main");
+                    sw.WriteLine($"git rebase -i origin/main");
+
+                    for (int i = 0; i < files.Length; i++)
+                        sw.WriteLine($"git add {files[i]}");
+
+                    sw.WriteLine($"git status");
+                    sw.WriteLine($"git commit -am \"Publish Updater Index\"");
+                    sw.WriteLine($"git push origin main");
+                }
+            }
+
+            cmd.WaitForExit();
+            Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
+        }
+
         private static void DownloadUpdaterIndex(System.Action<UpdaterInfo> onUpdaterIndexDownloaded)
         {
             //Set loading status
@@ -141,23 +194,6 @@ namespace Challenges
 
                 outdated.Invoke(updaterInfo.version.ToString() != currentPackage.version);
             }
-        }
-
-        public static UnityPackage GetCurrentPackage()
-        {
-            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-
-            //If the plugin exist in assets file, currentPackage should be null -> Build a new instance from json file
-            if (currentPackage == null)
-            {
-                string filePath = GetFilePath();
-                filePath.Replace("Editor/Updater.cs", "package.json");
-                UnityPackage packageInfo = default;
-                JsonUtility.FromJsonOverwrite(File.ReadAllText(filePath), packageInfo);
-                return currentPackage;
-            }
-
-            return currentPackage;
         }
 
         private static void UpdateTheChallengesUpdater()
@@ -732,6 +768,7 @@ namespace Challenges
             filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
             UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
 
+
             //Auto increment patch version if needed
             if (incrementVersion)
             {
@@ -741,91 +778,28 @@ namespace Challenges
                 revision++;
                 version = $"{parts[0]}.{parts[1]}.{revision}";
                 updaterInfo.version = version;
-
                 File.WriteAllText(filePath, JsonUtility.ToJson(updaterInfo, true));
             }
 
+
             //Write simplified version in the challenges repository
             string file = JsonUtility.ToJson(updaterInfo, true);
-            string indexDirectory = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
-            if (!Directory.Exists(indexDirectory))
-                Directory.CreateDirectory(indexDirectory);
-            File.WriteAllText(indexDirectory + "Index.json", file);
+            string indexPath = new DirectoryInfo(Application.dataPath).Parent.Parent.FullName + "\\Repository\\";
+            if (!Directory.Exists(indexPath))
+                Directory.CreateDirectory(indexPath);
+            File.WriteAllText(indexPath + "Index.json", file);
 
 
             //Publish the new updater version
-            {
-                string directory = new DirectoryInfo(GetFilePath()).Parent.FullName;
-                Process cmd = new Process();
-                ProcessStartInfo info = new ProcessStartInfo();
-                info.FileName = "cmd.exe";
-                info.RedirectStandardInput = true;
-                info.RedirectStandardOutput = true;
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
-                info.WindowStyle = ProcessWindowStyle.Hidden;
-                info.WorkingDirectory = directory;
+            string updaterWorkspace = new DirectoryInfo(GetFilePath()).Parent.FullName;
+            string[] updaterFiles = Directory.GetFiles(updaterWorkspace, "*", SearchOption.AllDirectories).
+                Where(x => !x.Contains("\\Challenges\\") && !x.Contains(".git")).ToArray();
+            SendGitFiles(updaterWorkspace, updaterFiles);
 
-                cmd.StartInfo = info;
-                cmd.Start();
-
-                using (StreamWriter sw = cmd.StandardInput)
-                {
-                    if (sw.BaseStream.CanWrite)
-                    {
-                        string[] files = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
-                        for (int i = 0; i < files.Length; i++)
-                        {
-                            if (files[i].Contains("\\Challenges\\") ||files[i].Contains(".git"))
-                                continue;
-
-                            sw.WriteLine($"git add {files[i]}");
-                        }
-
-                        sw.WriteLine($"git status");
-                        sw.WriteLine($"git commit -am \"Publish Updater\"");
-                        sw.WriteLine($"git push origin main");
-                    }
-                }
-
-                cmd.WaitForExit();
-                Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
-            }
 
             //Publish the new index
-            {
-                Process cmd = new Process();
-                ProcessStartInfo info = new ProcessStartInfo();
-                info.FileName = "cmd.exe";
-                info.RedirectStandardInput = true;
-                info.RedirectStandardOutput = true;
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
-                info.WindowStyle = ProcessWindowStyle.Hidden;
-                info.WorkingDirectory = indexDirectory;
-
-                cmd.StartInfo = info;
-                cmd.Start();
-
-                using (StreamWriter sw = cmd.StandardInput)
-                {
-                    if (sw.BaseStream.CanWrite)
-                    {
-                        sw.WriteLine($"git checkout main");
-                        sw.WriteLine($"git fetch origin main");
-                        sw.WriteLine($"git rebase -i origin/main");
-
-                        sw.WriteLine($"git add {indexDirectory}");
-
-                        sw.WriteLine($"git status");
-                        sw.WriteLine($"git commit -am \"Publish Updater Index\"");
-                        sw.WriteLine($"git push origin main");
-                    }
-                }
-
-                cmd.WaitForExit();
-                Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
-            }
+            string challengesWorkspace = new DirectoryInfo(indexPath).Parent.FullName;
+            SendGitFiles(challengesWorkspace, indexPath);
         }
 
         private void GenerateReadme()
