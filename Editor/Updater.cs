@@ -790,6 +790,7 @@ namespace Challenges
                 revision++;
                 version = $"{parts[0]}.{parts[1]}.{revision}";
                 updaterInfo.version = version;
+                localVersion = version;
                 File.WriteAllText(filePath, JsonUtility.ToJson(updaterInfo, true));
             }
 
