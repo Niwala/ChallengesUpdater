@@ -94,11 +94,7 @@ namespace Challenges
 
             LoadResources();
             LoadCache();
-
-            //Check updater version
-            ChallengesUpdaterIsOutdated((bool b) => { if (b) { updaterStatus = UpdaterStatus.Outdated; } });
-
-            
+            CheckUpdaterVersion();
         }
 
         private void OnDisable()
@@ -121,6 +117,11 @@ namespace Challenges
             }
 
             return currentPackage;
+        }
+
+        public static void CheckUpdaterVersion()
+        {
+            ChallengesUpdaterIsOutdated((bool b) => { updaterStatus = b ? UpdaterStatus.Outdated : UpdaterStatus.Valid; });
         }
 
         public static void SendGitFiles(string workspace, params string[] files)
@@ -191,10 +192,14 @@ namespace Challenges
 
             void OnUpdaterIndexDownloaded(UpdaterInfo updaterInfo)
             {
-                Debug.Log("Online version : " + updaterInfo.version);
-                Debug.Log("Package version : " + currentPackage.version);
-
-                outdated.Invoke(updaterInfo.version.ToString() != currentPackage.version);
+                bool b = updaterInfo.version.ToString() != currentPackage.version;
+                if (b)
+                {
+                    Debug.Log($"the Challenges Updater package version differs from the online version\n" +
+                        $"Online Version : {updaterInfo.version}\n" +
+                        $"Package Version : {currentPackage.version}");
+                }
+                outdated.Invoke(b);
             }
         }
 
@@ -244,19 +249,6 @@ namespace Challenges
         private static string GetFilePath([CallerFilePath] string sourceFilePath = "")
         {
             return sourceFilePath;
-        }
-
-        private bool UpdaterIsDeprecated()
-        {
-            UnityEditor.PackageManager.PackageInfo info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(Assembly.GetExecutingAssembly());
-
-            if (info == null)
-                return true;
-
-            Debug.Log(info.versions.latest + "  " + info.version);
-
-
-            return info.isDeprecated;
         }
 
         private void LoadStyles()
@@ -419,8 +411,11 @@ namespace Challenges
 
                     EditorGUI.HelpBox(rect, "", MessageType.None);
                     GUI.Label(titleRect, "Updater", titleStyle);
-                    if (GUI.Button(buttonRect, "Vérifier les mises à jour"))
+                    if (GUI.Button(buttonRect, "Update the challenges"))
+                    {
+                        CheckUpdaterVersion();
                         UpdateCache();
+                    }
                     break;
 
                 case UpdaterStatus.Loading:
@@ -439,14 +434,14 @@ namespace Challenges
                     GUI.EndClip();
 
 
-                    GUI.Label(rect, "Chargement...", centredtitleStyle);
+                    GUI.Label(rect, "Loading...", centredtitleStyle);
                     break;
 
                 case UpdaterStatus.Outdated:
                     EditorGUI.HelpBox(rect, "", MessageType.Warning);
-                    GUI.Label(titleRect, "Mise à jour disponible", titleStyle);
-                    GUI.Label(descriptionRect, "N'influence pas les challenges", descriptionStyle);
-                    if (GUI.Button(buttonRect, "Appliquer"))
+                    GUI.Label(titleRect, "Update available", titleStyle);
+                    GUI.Label(descriptionRect, "(Does not influence the challenges)", descriptionStyle);
+                    if (GUI.Button(buttonRect, "Apply"))
                         UpdateTheUpdater();
                     break;
 
@@ -454,7 +449,7 @@ namespace Challenges
                     EditorGUI.HelpBox(rect, "", MessageType.Error);
                     GUI.Label(titleRect, updaterErrorTitle, titleStyle);
                     GUI.Label(descriptionRect, updaterErrorMessage, descriptionStyle);
-                    if (GUI.Button(buttonRect, "Rafraichir"))
+                    if (GUI.Button(buttonRect, "Refresh"))
                         UpdateCache();
                     break;
             }
