@@ -66,6 +66,7 @@ namespace Challenges
         private static UpdaterStatus updaterStatus;
         private static string updaterErrorTitle;
         private static string updaterErrorMessage;
+        private static string updaterLoadingMessage;
 
         private static Texture2D previewMask;
         private static Shader previewShader;
@@ -97,160 +98,11 @@ namespace Challenges
 
             LoadResources();
             LoadCache();
-            CheckUpdaterVersion();
         }
 
         private void OnDisable()
         {
             DestroyImmediate(target);
-        }
-
-        public static UpdaterInfo GetCurrentPackage()
-        {
-            string filePath = GetFilePath();
-            filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
-            UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
-            return updaterInfo;
-        }
-
-        public static void CheckUpdaterVersion()
-        {
-            ChallengesUpdaterIsOutdated((bool b) => { updaterStatus = b ? UpdaterStatus.Outdated : UpdaterStatus.Valid; });
-        }
-
-        public static void SendGitFiles(string workspace, params string[] files)
-        {
-            Process cmd = new Process();
-            ProcessStartInfo info = new ProcessStartInfo();
-            info.FileName = "cmd.exe";
-            info.RedirectStandardInput = true;
-            info.RedirectStandardOutput = true;
-            info.UseShellExecute = false;
-            info.CreateNoWindow = true;
-            info.WindowStyle = ProcessWindowStyle.Hidden;
-            info.WorkingDirectory = workspace;
-
-            cmd.StartInfo = info;
-            cmd.Start();
-
-            using (StreamWriter sw = cmd.StandardInput)
-            {
-                if (sw.BaseStream.CanWrite)
-                {
-                    sw.WriteLine($"git checkout main");
-                    sw.WriteLine($"git fetch origin main");
-                    sw.WriteLine($"git rebase -i origin/main");
-
-                    for (int i = 0; i < files.Length; i++)
-                        sw.WriteLine($"git add {files[i]}");
-
-                    sw.WriteLine($"git status");
-                    sw.WriteLine($"git commit -am \"Publish Updater Index\"");
-                    sw.WriteLine($"git push origin main");
-                }
-            }
-
-            cmd.WaitForExit();
-            Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
-        }
-
-        private static void DownloadUpdaterIndex(System.Action<UpdaterInfo> onUpdaterIndexDownloaded)
-        {
-            //Set loading status
-            updaterStatus = UpdaterStatus.Loading;
-
-            //Download project infos
-            string uri = $"{Updater.gitDownloadUrl}/Index.json";
-            DownloadFile(uri, (DownloadHandler handler) =>
-            {
-                if (onUpdaterIndexDownloaded != null)
-                    onUpdaterIndexDownloaded.Invoke(JsonUtility.FromJson<UpdaterInfo>(handler.text));
-            });
-        }
-
-        private static void ChallengesUpdaterIsOutdated(System.Action<bool> outdated)
-        {
-            //Check updater version
-            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-
-            //The plugin exist in the assets and not the package manager.
-            //So it should always be up to date or updated by git and not the package manager.
-            if (currentPackage == null)
-            {
-                localVersion = GetCurrentPackage().version;
-                outdated.Invoke(false);
-                return;
-            }
-            localVersion = currentPackage.version;
-
-            //We need to download the index to find out the latest version of the plugin.
-            DownloadUpdaterIndex(OnUpdaterIndexDownloaded);
-
-            void OnUpdaterIndexDownloaded(UpdaterInfo updaterInfo)
-            {
-                onlineVersion = updaterInfo.version.ToString();
-                bool isOutdated = OutDated(localVersion, onlineVersion);
-                if (isOutdated)
-                {
-                    Debug.Log($"the Challenges Updater package version differs from the online version\n" +
-                        $"Online Version : {updaterInfo.version}\n" +
-                        $"Package Version : {currentPackage.version}");
-                }
-                outdated.Invoke(isOutdated);
-            }
-        }
-
-        private static void UpdateTheUpdater()
-        {
-            //Check if the plugin exist in package (and not in the project assets)
-            string filePath = GetFilePath().Replace('\\', '/');
-            bool pluginIsInPackage = !filePath.StartsWith(Application.dataPath);
-
-            //We don't want to add the package if the plugin is present in the Assets
-            if (!pluginIsInPackage)
-            {
-                Debug.LogError("The plugin is not recognised as a package, and therefore cannot be updated.");
-                return;
-            }
-
-            //Send the request to the package manager 
-            EditorUtility.DisplayProgressBar("Challenges Updater", "Downloading the package...", 0.0f);
-            Client.Add(Updater.gitUpdaterUrl);
-            EditorUtility.ClearProgressBar();
-        }
-
-        private static void LoadResources()
-        {
-            //Get data directory
-            string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "Data\\");
-
-            //Plugin is in Assets
-            if (dataPath.StartsWith(Application.dataPath.Replace('/', '\\')))
-            {
-                dataPath = dataPath.Remove(0, Application.dataPath.Length - 6);
-            }
-
-            //Plugin is in Package Cache
-            else
-            {
-                dataPath = "Packages\\com.niwala.challengesupdater\\Editor\\Data\\";
-            }
-
-            if (previewMask == null)
-                previewMask = AssetDatabase.LoadAssetAtPath<Texture2D>(dataPath + "PreviewMask.png");
-
-            if (previewShader == null)
-                previewShader = AssetDatabase.LoadAssetAtPath<Shader>(dataPath + "PreviewShader.shader");
-
-            if (previewMaterial == null)
-                previewMaterial = new Material(previewShader);
-
-            previewMaterial.SetTexture("_Mask", previewMask);
-        }
-
-        private static string GetFilePath([CallerFilePath] string sourceFilePath = "")
-        {
-            return sourceFilePath;
         }
 
         private void LoadStyles()
@@ -360,17 +212,6 @@ namespace Challenges
             GUILayout.EndHorizontal();
         }
 
-        private void ExportAllChallenges()
-        {
-            string[] guids = AssetDatabase.FindAssets("t:TutoPack");
-            for (int i = 0; i < guids.Length; i++)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                TutoPack tutoPack = AssetDatabase.LoadAssetAtPath<TutoPack>(path);
-                TutoPack_Editor.Export(tutoPack);
-            }
-        }
-
         public override void OnInspectorGUI()
         {
             if (!stylesLoaded)
@@ -416,8 +257,8 @@ namespace Challenges
                     GUI.Label(descriptionRect, localVersion, descriptionStyle);
                     if (GUI.Button(buttonRect, "Check updates"))
                     {
-                        CheckUpdaterVersion();
-                        UpdateCache();
+                        updaterStatus = UpdaterStatus.Loading;
+                        ChallengesUpdaterIsOutdated(OnGetUpdaterVersion);
                     }
                     break;
 
@@ -438,6 +279,7 @@ namespace Challenges
 
 
                     GUI.Label(rect, "Loading...", centredtitleStyle);
+                    GUI.Label(descriptionRect, updaterLoadingMessage, descriptionStyle);
                     break;
 
                 case UpdaterStatus.Outdated:
@@ -456,6 +298,181 @@ namespace Challenges
                         UpdateCache();
                     break;
             }
+        }
+
+        private void OnGetUpdaterVersion(bool outdated)
+        {
+            if (outdated)
+            {
+                updaterStatus = UpdaterStatus.Outdated;
+            }
+            else
+            {
+                UpdateCache();
+            }
+        }
+
+        private void OnCacheUpdated()
+        {
+            LoadCache();
+            updaterStatus = UpdaterStatus.Valid;
+        }
+
+        private void ExportAllChallenges()
+        {
+            string[] guids = AssetDatabase.FindAssets("t:TutoPack");
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                TutoPack tutoPack = AssetDatabase.LoadAssetAtPath<TutoPack>(path);
+                TutoPack_Editor.Export(tutoPack);
+            }
+        }
+
+        public static UpdaterInfo GetCurrentPackage()
+        {
+            string filePath = GetFilePath();
+            filePath = filePath.Replace("Editor\\Updater.cs", "package.json");
+            UpdaterInfo updaterInfo = JsonUtility.FromJson<UpdaterInfo>(File.ReadAllText(filePath));
+            return updaterInfo;
+        }
+
+        public static void SendGitFiles(string workspace, params string[] files)
+        {
+            Process cmd = new Process();
+            ProcessStartInfo info = new ProcessStartInfo();
+            info.FileName = "cmd.exe";
+            info.RedirectStandardInput = true;
+            info.RedirectStandardOutput = true;
+            info.UseShellExecute = false;
+            info.CreateNoWindow = true;
+            info.WindowStyle = ProcessWindowStyle.Hidden;
+            info.WorkingDirectory = workspace;
+
+            cmd.StartInfo = info;
+            cmd.Start();
+
+            using (StreamWriter sw = cmd.StandardInput)
+            {
+                if (sw.BaseStream.CanWrite)
+                {
+                    sw.WriteLine($"git checkout main");
+                    sw.WriteLine($"git fetch origin main");
+                    sw.WriteLine($"git rebase -i origin/main");
+
+                    for (int i = 0; i < files.Length; i++)
+                        sw.WriteLine($"git add {files[i]}");
+
+                    sw.WriteLine($"git status");
+                    sw.WriteLine($"git commit -am \"Publish Updater Index\"");
+                    sw.WriteLine($"git push origin main");
+                }
+            }
+
+            cmd.WaitForExit();
+            Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
+        }
+
+        private static void DownloadUpdaterIndex(System.Action<UpdaterInfo> onUpdaterIndexDownloaded)
+        {
+            //Set loading status
+            updaterStatus = UpdaterStatus.Loading;
+
+            //Download project infos
+            string uri = $"{Updater.gitDownloadUrl}/Index.json";
+            DownloadFile(uri, (DownloadHandler handler) =>
+            {
+                if (onUpdaterIndexDownloaded != null)
+                    onUpdaterIndexDownloaded.Invoke(JsonUtility.FromJson<UpdaterInfo>(handler.text));
+            });
+        }
+
+        private static void ChallengesUpdaterIsOutdated(System.Action<bool> outdated)
+        {
+            //Check updater version
+            UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
+            updaterLoadingMessage = "Check the Updater Version";
+
+            //The plugin exist in the assets and not the package manager.
+            //So it should always be up to date or updated by git and not the package manager.
+            if (currentPackage == null)
+            {
+                localVersion = GetCurrentPackage().version;
+                outdated.Invoke(false);
+                return;
+            }
+            localVersion = currentPackage.version;
+
+            //We need to download the index to find out the latest version of the plugin.
+            DownloadUpdaterIndex(OnUpdaterIndexDownloaded);
+
+            void OnUpdaterIndexDownloaded(UpdaterInfo updaterInfo)
+            {
+                onlineVersion = updaterInfo.version.ToString();
+                bool isOutdated = OutDated(localVersion, onlineVersion);
+                if (isOutdated)
+                {
+                    Debug.Log($"the Challenges Updater package version differs from the online version\n" +
+                        $"Online Version : {updaterInfo.version}\n" +
+                        $"Package Version : {currentPackage.version}");
+                }
+                outdated.Invoke(isOutdated);
+            }
+        }
+
+        private static void UpdateTheUpdater()
+        {
+            updaterLoadingMessage = "Update the Challenges Updater";
+
+            //Check if the plugin exist in package (and not in the project assets)
+            string filePath = GetFilePath().Replace('\\', '/');
+            bool pluginIsInPackage = !filePath.StartsWith(Application.dataPath);
+
+            //We don't want to add the package if the plugin is present in the Assets
+            if (!pluginIsInPackage)
+            {
+                Debug.LogError("The plugin is not recognised as a package, and therefore cannot be updated.");
+                return;
+            }
+
+            //Send the request to the package manager 
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Downloading the package...", 0.0f);
+            Client.Add(Updater.gitUpdaterUrl);
+            EditorUtility.ClearProgressBar();
+        }
+
+        private static void LoadResources()
+        {
+            //Get data directory
+            string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "Data\\");
+
+            //Plugin is in Assets
+            if (dataPath.StartsWith(Application.dataPath.Replace('/', '\\')))
+            {
+                dataPath = dataPath.Remove(0, Application.dataPath.Length - 6);
+            }
+
+            //Plugin is in Package Cache
+            else
+            {
+                dataPath = "Packages\\com.niwala.challengesupdater\\Editor\\Data\\";
+            }
+
+            if (previewMask == null)
+                previewMask = AssetDatabase.LoadAssetAtPath<Texture2D>(dataPath + "PreviewMask.png");
+
+            if (previewShader == null)
+                previewShader = AssetDatabase.LoadAssetAtPath<Shader>(dataPath + "PreviewShader.shader");
+
+            if (previewMaterial == null)
+                previewMaterial = new Material(previewShader);
+
+            previewMaterial.SetTexture("_Mask", previewMask);
+        }
+
+        private static string GetFilePath([CallerFilePath] string sourceFilePath = "")
+        {
+            return sourceFilePath;
         }
 
         public static bool OutDated(string localVersion, string onlineVersion)
@@ -863,18 +880,7 @@ namespace Challenges
         private void LoadCache()
         {
             CheckCacheDirectories();
-
-
-            //Check project update
-            //UpdaterInfo projectInfo = default;
-            //if (File.Exists($"{cacheDir}/UpdaterInfo.json"))
-            //{
-            //    string projectInfoFile = File.ReadAllText($"{cacheDir}/UpdaterInfo.json");
-            //    projectInfo = JsonUtility.FromJson<UpdaterInfo>(projectInfoFile);
-            //}
-            //if (projectInfo.version > Updater.projectVersion)
-            //    updaterStatus = UpdaterStatus.Outdated;
-
+            updaterLoadingMessage = "Load the local cache";
 
             //Read all challenge infos
             Dictionary<string, ChallengeInfo> infos = new Dictionary<string, ChallengeInfo>();
@@ -949,6 +955,7 @@ namespace Challenges
         private void UpdateCache()
         {
             updaterStatus = UpdaterStatus.Loading;
+            updaterLoadingMessage = "Update the local cache";
             List<ChallengeInfo> infos = new List<ChallengeInfo>();
             CheckCacheDirectories();
 
@@ -1012,6 +1019,7 @@ namespace Challenges
 
                 GitChallenge gitChallenge = gitChallenges.Dequeue();
 
+                updaterLoadingMessage = $"Check {gitChallenge.info.name}";
                 DownloadFile(gitChallenge.info.download_url, (DownloadHandler handler) =>
                 {
                     //Read downloaded file
@@ -1044,14 +1052,6 @@ namespace Challenges
                     //Download next challenge
                     DownloadChallengeInfos(gitChallenges, endCallback);
                 });
-            }
-
-
-            void OnCacheUpdated()
-            {
-                if (updaterStatus == UpdaterStatus.Loading)
-                    updaterStatus = UpdaterStatus.Valid;
-                LoadCache();
             }
         }
 
