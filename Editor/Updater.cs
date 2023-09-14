@@ -334,6 +334,7 @@ namespace Challenges
             if (status.preview != null)
             {
                 Rect previewRect = new Rect(rect.x + rect.width - (rect.height - 1) * 2 - 1, rect.y + 1, (rect.height - 1) * 2, rect.height - 2);
+                previewMaterial.SetInt("_ColorSpace", (int) PlayerSettings.colorSpace);
                 EditorGUI.DrawPreviewTexture(previewRect, status.preview, previewMaterial);
             }
 

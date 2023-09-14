@@ -34,6 +34,7 @@ Shader "Hidden/PreviewShader"
 
             sampler2D _MainTex;
             sampler2D _Mask;
+            int _ColorSpace;
 
             v2f vert (appdata v)
             {
@@ -47,6 +48,11 @@ Shader "Hidden/PreviewShader"
             {
                 fixed4 col = tex2D(_MainTex, i.uv);
                 col.a = tex2D(_Mask, i.uv).r;
+
+                //Gamma correction
+                if (_ColorSpace == 1)
+                    col = pow(col, 0.454545);
+
                 return col;
             }
             ENDCG
