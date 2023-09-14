@@ -67,6 +67,7 @@ namespace Challenges
         private static string updaterErrorTitle;
         private static string updaterErrorMessage;
         private static string updaterLoadingMessage;
+        private static UnityWebRequest currentRequest;
 
         private static Texture2D previewMask;
         private static Shader previewShader;
@@ -249,10 +250,9 @@ namespace Challenges
             switch (updaterStatus)
             {
                 case UpdaterStatus.Valid:
+                    EditorGUI.HelpBox(rect, "", MessageType.None);
 
                     buttonRect = new Rect(rect.x + rect.width - 190, rect.y + rect.height - 25, 185, 20);
-
-                    EditorGUI.HelpBox(rect, "", MessageType.None);
                     GUI.Label(titleRect, "Updater", titleStyle);
                     GUI.Label(descriptionRect, localVersion, descriptionStyle);
                     if (GUI.Button(buttonRect, "Check updates"))
@@ -263,6 +263,7 @@ namespace Challenges
                     break;
 
                 case UpdaterStatus.Loading:
+                    EditorGUI.HelpBox(rect, "", MessageType.None);
 
                     //Loading bar
                     Rect clipRect = new Rect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
@@ -669,13 +670,17 @@ namespace Challenges
 
         private static void DownloadFile(string uri, System.Action<DownloadHandler> callback)
         {
-            UnityWebRequest request = UnityWebRequest.Get(uri);
-            request.SetRequestHeader("authorization", Updater.gitToken);
-            request.SendWebRequest().completed += WebRequestCompleted;
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", 0.0f);
+            currentRequest = UnityWebRequest.Get(uri);
+            currentRequest.SetRequestHeader("authorization", Updater.gitToken);
+            currentRequest.SendWebRequest().completed += WebRequestCompleted;
+            EditorApplication.update += TrackRequestProgress;
 
             void WebRequestCompleted(AsyncOperation obj)
             {
                 UnityWebRequest request = (obj as UnityWebRequestAsyncOperation).webRequest;
+                EditorApplication.update -= TrackRequestProgress;
+                EditorUtility.ClearProgressBar();
 
                 if (LogErrorIfAny(request))
                     return;
@@ -688,7 +693,6 @@ namespace Challenges
 
         private void DownloadPackage(string uri, bool manualImport = false)
         {
-            EditorUtility.DisplayProgressBar("Challenges Updater", "Download package", 0.0f);
             DownloadFile(uri, (DownloadHandler handler) =>
             {
                 byte[] bytes = handler.data;
@@ -700,7 +704,6 @@ namespace Challenges
                 AssetDatabase.importPackageFailed += ImportPackageFailed;
                 AssetDatabase.importPackageCancelled += ImportPackageCancelled;
                 AssetDatabase.ImportPackage(path + "Challenge.unitypackage", manualImport);
-                EditorUtility.ClearProgressBar();
             });
         }
 
@@ -1079,6 +1082,16 @@ namespace Challenges
 
                 filteredChallengeList.Add(challengeList[i]);
             }
+        }
+
+        private static void TrackRequestProgress()
+        {
+            if (currentRequest.isDone)
+            {
+                EditorApplication.update -= TrackRequestProgress;
+            }
+
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", currentRequest.downloadProgress);
         }
 
         private struct Status
