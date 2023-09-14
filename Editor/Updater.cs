@@ -241,15 +241,15 @@ namespace Challenges
                 GUI.color = Color.white;
             }
 
-            Rect titleRect = new Rect(rect.x + 40, rect.y + 10, rect.width - 10, 26);
-            Rect descriptionRect = new Rect(rect.x + 12, rect.y + 40, rect.width - 100, rect.height - 40);
+            Rect iconTitleRect = new Rect(rect.x + 40, rect.y + 10, rect.width - 10, 26);
+            Rect titleRect = new Rect(rect.x + 5, rect.y + 5, rect.width - 10, 24);
+            Rect descriptionRect = new Rect(rect.x + 7, rect.y + 30, rect.width, 35);
             Rect buttonRect = new Rect(rect.x + rect.width - 90, rect.y + rect.height - 25, 85, 20);
 
             switch (updaterStatus)
             {
                 case UpdaterStatus.Valid:
 
-                    titleRect = new Rect(rect.x + 10, rect.y + 10, rect.width - 10, 26);
                     buttonRect = new Rect(rect.x + rect.width - 190, rect.y + rect.height - 25, 185, 20);
 
                     EditorGUI.HelpBox(rect, "", MessageType.None);
@@ -263,28 +263,26 @@ namespace Challenges
                     break;
 
                 case UpdaterStatus.Loading:
-                    EditorGUI.HelpBox(rect, "", MessageType.None);
-                    rect.Set(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
-                    GUI.BeginClip(rect);
 
-                    Rect lineRect = new Rect(1, rect.height - 3, rect.width - 2, 3);
+                    //Loading bar
+                    Rect clipRect = new Rect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
+                    GUI.BeginClip(clipRect);
+                    Rect lineRect = new Rect(1, clipRect.height - 3, clipRect.width - 2, 3);
                     Rect barRect = new Rect(0, lineRect.y, 100, lineRect.height);
-
                     float progress = (float)((EditorApplication.timeSinceStartup * .5) % 1);
                     barRect.x = lineRect.x - 100 + progress * (lineRect.width + 100);
-
                     EditorGUI.DrawRect(lineRect, new Color(0.0f, 0.0f, 0.0f, 0.7f));
                     EditorGUI.DrawRect(barRect, new Color(0.4f, 0.8f, 1.0f, 0.7f));
                     GUI.EndClip();
 
 
-                    GUI.Label(rect, "Loading...", centredtitleStyle);
+                    GUI.Label(titleRect, "Loading...", titleStyle);
                     GUI.Label(descriptionRect, updaterLoadingMessage, descriptionStyle);
                     break;
 
                 case UpdaterStatus.Outdated:
                     EditorGUI.HelpBox(rect, "", MessageType.Warning);
-                    GUI.Label(titleRect, "Update available", titleStyle);
+                    GUI.Label(iconTitleRect, "Update available", titleStyle);
                     GUI.Label(descriptionRect, $"Local : {localVersion} Online : {onlineVersion}\n(Does not influence the challenges)", descriptionStyle);
                     if (GUI.Button(buttonRect, "Apply"))
                         UpdateTheUpdater();
@@ -292,11 +290,109 @@ namespace Challenges
 
                 case UpdaterStatus.Error:
                     EditorGUI.HelpBox(rect, "", MessageType.Error);
-                    GUI.Label(titleRect, updaterErrorTitle, titleStyle);
+                    GUI.Label(iconTitleRect, updaterErrorTitle, titleStyle);
                     GUI.Label(descriptionRect, updaterErrorMessage, descriptionStyle);
                     if (GUI.Button(buttonRect, "Refresh"))
                         UpdateCache();
                     break;
+            }
+        }
+
+        private void DrawChallengeGUI(Status status)
+        {
+            string name = status.name;
+
+            Rect rect = GUILayoutUtility.GetRect(200.0f, 150.0f);
+            rect.Set(rect.x + 10, rect.y + 5, rect.width - 20, rect.height - 10);
+
+            Rect btnRect = new Rect(rect.x + rect.width - 42, rect.y + 6, 36, 36);
+            int openMenu = GUI.Button(btnRect, "", GUIStyle.none) ? 1 : 0;
+
+            bool focus = rect.Contains(Event.current.mousePosition);
+            if (focus)
+            {
+                GUI.color = new Color(0.3f, 0.8f, 1.6f, 1.0f);
+                GUI.Box(rect, "", EditorStyles.helpBox);
+                GUI.color = Color.white;
+            }
+            EditorGUIUtility.AddCursorRect(btnRect, MouseCursor.Link);
+
+            if (GUI.Button(rect, "", EditorStyles.helpBox))
+            {
+                if (Event.current.button == 0)
+                {
+                    if (status.status != ChallengeStatus.New)
+                        OpenChallenge(name);
+                }
+                else
+                {
+                    openMenu = 2;
+                }
+            }
+
+            if (status.preview != null)
+            {
+                Rect previewRect = new Rect(rect.x + rect.width - (rect.height - 1) * 2 - 1, rect.y + 1, (rect.height - 1) * 2, rect.height - 2);
+                EditorGUI.DrawPreviewTexture(previewRect, status.preview, previewMaterial);
+            }
+
+
+            Rect titleRect = new Rect(rect.x + 5, rect.y + 5, rect.width - 10, 24);
+            GUI.Label(titleRect, ObjectNames.NicifyVariableName(name), titleStyle);
+
+            Rect descriptionRect = new Rect(rect.x + 15, rect.y + 35, rect.width - rect.height * 1.5f, rect.height - 35);
+            GUI.Label(descriptionRect, status.description, descriptionStyle);
+
+            DrawStatus(btnRect, status.status);
+
+            if (openMenu > 0)
+            {
+                GenericMenu menu = new GenericMenu();
+
+                menu.AddDisabledItem(new GUIContent($"Status : {ObjectNames.NicifyVariableName(status.status.ToString())}"));
+                menu.AddSeparator("");
+
+                switch (status.status)
+                {
+                    case ChallengeStatus.Good:
+                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
+                        menu.AddItem(new GUIContent("Reimport"), false, () => ReimportChallenge(name));
+                        break;
+                    case ChallengeStatus.MinorUpdate:
+                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
+                        menu.AddItem(new GUIContent("Reimport"), false, () => ReimportChallenge(name));
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Update"), false, () => UpdateChallenge(name, false));
+                        break;
+                    case ChallengeStatus.MajorUpdate:
+                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
+                        menu.AddItem(new GUIContent("Reimport"), false, () => ReimportChallenge(name));
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Update"), false, () => { UpdateChallenge(name, true); });
+                        break;
+                    case ChallengeStatus.New:
+                        menu.AddDisabledItem(new GUIContent("Open"), false);
+                        menu.AddItem(new GUIContent("Download"), false, () => DownloadChallenge(name));
+                        break;
+                    case ChallengeStatus.Deprecated:
+                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
+                        menu.AddSeparator("");
+                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
+                        break;
+                }
+
+                if (openMenu == 1)
+                    menu.DropDown(btnRect);
+                else
+                    menu.ShowAsContext();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                LoadCache();
             }
         }
 
@@ -486,104 +582,6 @@ namespace Challenges
             return false;
         }
 
-        private void DrawChallengeGUI(Status status)
-        {
-            string name = status.name;
-
-            Rect rect = GUILayoutUtility.GetRect(200.0f, 150.0f);
-            rect.Set(rect.x + 10, rect.y + 5, rect.width - 20, rect.height - 10);
-
-            Rect btnRect = new Rect(rect.x + rect.width - 42, rect.y + 6, 36, 36);
-            int openMenu = GUI.Button(btnRect, "", GUIStyle.none) ? 1 : 0;
-
-            bool focus = rect.Contains(Event.current.mousePosition);
-            if (focus)
-            {
-                GUI.color = new Color(0.3f, 0.8f, 1.6f, 1.0f);
-                GUI.Box(rect, "", EditorStyles.helpBox);
-                GUI.color = Color.white;
-            }
-            EditorGUIUtility.AddCursorRect(btnRect, MouseCursor.Link);
-
-            if (GUI.Button(rect, "", EditorStyles.helpBox))
-            {
-                if (Event.current.button == 0)
-                {
-                    if (status.status != ChallengeStatus.New)
-                        OpenChallenge(name);
-                }
-                else
-                {
-                    openMenu = 2;
-                }
-            }
-
-            if (status.preview != null)
-            {
-                Rect previewRect = new Rect(rect.x + rect.width - (rect.height - 1) * 2 - 1, rect.y + 1, (rect.height - 1) * 2, rect.height - 2);
-                EditorGUI.DrawPreviewTexture(previewRect, status.preview, previewMaterial);
-            }
-
-
-            Rect titleRect = new Rect(rect.x + 5, rect.y + 5, rect.width - 10, 24);
-            GUI.Label(titleRect, ObjectNames.NicifyVariableName(name), titleStyle);
-
-            Rect descriptionRect = new Rect(rect.x + 15, rect.y + 35, rect.width - rect.height * 1.5f, rect.height - 35);
-            GUI.Label(descriptionRect, status.description, descriptionStyle);
-
-            DrawStatus(btnRect, status.status);
-
-            if (openMenu > 0)
-            {
-                GenericMenu menu = new GenericMenu();
-
-                menu.AddDisabledItem(new GUIContent($"Status : {ObjectNames.NicifyVariableName(status.status.ToString())}"));
-                menu.AddSeparator("");
-
-                switch (status.status)
-                {
-                    case ChallengeStatus.Good:
-                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
-                        menu.AddSeparator("");
-                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
-                        menu.AddItem(new GUIContent("Reimport"), false, () => ReimportChallenge(name));
-                        break;
-                    case ChallengeStatus.MinorUpdate:
-                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
-                        menu.AddSeparator("");
-                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
-                        menu.AddItem(new GUIContent("Reimport"), false, () => ReimportChallenge(name));
-                        menu.AddSeparator("");
-                        menu.AddItem(new GUIContent("Update"), false, () => UpdateChallenge(name, false));
-                        break;
-                    case ChallengeStatus.MajorUpdate:
-                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
-                        menu.AddSeparator("");
-                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
-                        menu.AddItem(new GUIContent("Reimport"), false, () => ReimportChallenge(name));
-                        menu.AddSeparator("");
-                        menu.AddItem(new GUIContent("Update"), false, () => { UpdateChallenge(name, true); });
-                        break;
-                    case ChallengeStatus.New:
-                        menu.AddDisabledItem(new GUIContent("Open"), false);
-                        menu.AddItem(new GUIContent("Download"), false, () => DownloadChallenge(name));
-                        break;
-                    case ChallengeStatus.Deprecated:
-                        menu.AddItem(new GUIContent("Open"), false, () => OpenChallenge(name));
-                        menu.AddSeparator("");
-                        menu.AddItem(new GUIContent("Remove"), false, () => DeleteChallenge(name, true));
-                        break;
-                }
-
-                if (openMenu == 1)
-                    menu.DropDown(btnRect);
-                else
-                    menu.ShowAsContext();
-                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-                LoadCache();
-            }
-        }
-
         private void DrawStatus(Rect rect, ChallengeStatus status)
         {
             switch (status)
@@ -690,6 +688,7 @@ namespace Challenges
 
         private void DownloadPackage(string uri, bool manualImport = false)
         {
+            EditorUtility.DisplayProgressBar("Challenges Updater", "Download package", 0.0f);
             DownloadFile(uri, (DownloadHandler handler) =>
             {
                 byte[] bytes = handler.data;
@@ -701,6 +700,7 @@ namespace Challenges
                 AssetDatabase.importPackageFailed += ImportPackageFailed;
                 AssetDatabase.importPackageCancelled += ImportPackageCancelled;
                 AssetDatabase.ImportPackage(path + "Challenge.unitypackage", manualImport);
+                EditorUtility.ClearProgressBar();
             });
         }
 
