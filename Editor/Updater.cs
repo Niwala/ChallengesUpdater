@@ -898,6 +898,9 @@ namespace Challenges
 
                 if (files[i].EndsWith(".json"))
                 {
+                    if (files[i].EndsWith("UpdaterInfo.json"))
+                        continue;
+
                     ChallengeInfo info = infos[challengeName];
                     Texture2D preview = info.preview;
                     info = JsonUtility.FromJson<ChallengeInfo>(File.ReadAllText(files[i]));
