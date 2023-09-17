@@ -1185,7 +1185,8 @@ namespace Challenges
         {
             //Update pack hash
             pack.UpdateHash();
-
+            EditorUtility.SetDirty(pack);
+            AssetDatabase.SaveAssetIfDirty(pack);
 
             //Get path
             string contentPath = new FileInfo(AssetDatabase.GetAssetPath(pack)).DirectoryName;
