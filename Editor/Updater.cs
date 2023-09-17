@@ -1201,7 +1201,7 @@ namespace Challenges
             public string teacher;
             public string tags;
             public string description;
-            public Hash128 hash;
+            public string hash;
             public float priority;
             public bool hidden;
             public Texture2D preview;

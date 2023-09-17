@@ -20,21 +20,23 @@ namespace Challenges
         public string tags;
         public Object scene;
         public string onOpen;
-        public Hash128 hash;
+        public string hash;
 
         public void UpdateHash()
         {
-            hash = preview.imageContentsHash;
-            hash.Append(pages.Count);
+
+            Hash128 h = preview.imageContentsHash;
+            h.Append(pages.Count);
             for (int i = 0; i < pages.Count; i++)
-                hash.Append(pages[i].GetHash().ToString());
-            hash.Append(description);
-            hash.Append(priority);
-            hash.Append(hidden.ToString());
-            hash.Append(teacher);
-            hash.Append(tags);
-            hash.Append(scene.GetHashCode());
-            hash.Append(onOpen);
+                h.Append(pages[i].GetHash().ToString());
+            h.Append(description);
+            h.Append(priority);
+            h.Append(hidden.ToString());
+            h.Append(teacher);
+            h.Append(tags);
+            h.Append(scene.GetHashCode());
+            h.Append(onOpen);
+            hash = h.ToString();
         }
     }
 
