@@ -214,7 +214,7 @@ namespace Challenges
                     menu.AddDisabledItem(new GUIContent("⠀"));
                     menu.AddDisabledItem(new GUIContent("Dev area"));
                     menu.AddItem(new GUIContent("Edit"), false, () => { editTuto = !editTuto; });
-                    menu.AddItem(new GUIContent("Publish"), false, () => { PublisherInfoEditor.Open(OnPublish); });
+                    menu.AddItem(new GUIContent("Publish"), false, () => {  OnPublish(); });
                 }
                 menu.DropDown(rect);
             }
@@ -896,7 +896,12 @@ namespace Challenges
             if (GUILayout.Button("Export"))
                 Export(pack);
             if (GUILayout.Button("Publish"))
-                PublisherInfoEditor.Open(OnPublish);
+            {
+                if (Event.current.shift)
+                    OnPublish();
+                else
+                    PublisherInfoEditor.Open(OnPublish);
+            }
 
             GUILayout.EndVertical();
         }
