@@ -423,6 +423,8 @@ namespace Challenges
             {
                 string path = AssetDatabase.GUIDToAssetPath(guids[i]);
                 TutoPack tutoPack = AssetDatabase.LoadAssetAtPath<TutoPack>(path);
+                if (tutoPack.hidden)
+                    continue;
                 TutoPack_Editor.Export(tutoPack);
             }
         }
