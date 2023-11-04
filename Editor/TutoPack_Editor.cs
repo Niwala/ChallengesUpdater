@@ -881,7 +881,7 @@ namespace Challenges
             targetObject.UpdateIfRequiredOrScript();
             GUILayout.Label(pack.name, titleStyle);
             GUILayout.Space(5);
-            GUILayout.Label("Hash : " + pack.hash.ToString());
+            GUILayout.Label("Hash : " + pack.hash?.ToString());
             EditorGUILayout.PropertyField(targetObject.FindProperty("hidden"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("teacher"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("scene"));
