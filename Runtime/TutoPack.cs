@@ -24,7 +24,10 @@ namespace Challenges
 
         public void UpdateHash()
         {
-
+            if (preview == null)
+            {
+                throw new System.Exception($"Missing preview on {name} challenge.");
+            }
             Hash128 h = preview.imageContentsHash;
             h.Append(pages.Count);
             for (int i = 0; i < pages.Count; i++)
