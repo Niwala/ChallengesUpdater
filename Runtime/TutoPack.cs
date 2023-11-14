@@ -2,12 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 
 namespace Challenges
 {
     [CreateAssetMenu(menuName = "Tuto pack", order = 51), System.Serializable]
     public class TutoPack : ScriptableObject
     {
+        public TutoPack parent;
         public List<TutoPage> pages = new List<TutoPage>();
 
         [Multiline(6)]
@@ -62,6 +64,7 @@ namespace Challenges
         {
             public Type type;
             [Multiline] public string text;
+            public string altText;
             public int padding;
             public Object obj;
 
@@ -87,7 +90,21 @@ namespace Challenges
             Code,
             Hint,
             Shader,
-            Separator
+            Separator,
+            Image,
+            Video,
+            LinkToChallenge,
+            BeginCallout,
+            EndCallout,
+            BeginFoldout,
+            EndFoldout,
+        }
+
+        public enum Container
+        {
+            None,
+            Enter,
+            Exit
         }
 
         public TutoPage Copy()
@@ -96,6 +113,26 @@ namespace Challenges
             for (int i = 0; i < content.Count; i++)
                 copy.content.Add(content[i]);
             return copy;
+        }
+    }
+
+    public class ChallengeElementContainer : ScriptableObject
+    {
+        public TutoPack challenge;
+        public TutoPage page;
+        public int contentID;
+
+        public static void Open(TutoPage page, int elementID)
+        {
+#if UNITY_EDITOR
+            ChallengeElementContainer container = ScriptableObject.CreateInstance<ChallengeElementContainer>();
+            container.page = page;
+            container.contentID = elementID;
+
+
+
+            UnityEditor.Selection.activeObject = container;
+#endif
         }
     }
 }

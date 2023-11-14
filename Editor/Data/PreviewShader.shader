@@ -35,6 +35,8 @@ Shader "Hidden/PreviewShader"
             sampler2D _MainTex;
             sampler2D _Mask;
             int _ColorSpace;
+            float4 _WorldClip;
+            float4 _WorldRect;
 
             v2f vert (appdata v)
             {
@@ -46,6 +48,11 @@ Shader "Hidden/PreviewShader"
 
             fixed4 frag (v2f i) : SV_Target
             {
+                float2 coords = lerp(_WorldRect.xy, _WorldRect.zw, float2(i.uv.x, 1.0 - i.uv.y));
+
+                if (coords.x > (_WorldClip.z) || coords.x < _WorldClip.x ||coords.y < _WorldClip.y || coords.y > _WorldClip.w )
+                    return float4(0, 0, 0, 0);
+
                 fixed4 col = tex2D(_MainTex, i.uv);
                 col.a = tex2D(_Mask, i.uv).r;
 

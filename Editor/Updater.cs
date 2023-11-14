@@ -15,6 +15,9 @@ using UnityEditor.PackageManager.Requests;
 using System.Runtime.CompilerServices;
 using UnityPackage = UnityEditor.PackageManager.PackageInfo;
 using Debug = UnityEngine.Debug;
+using System;
+using UnityEngine.Rendering;
+using static Challenges.Updater_Editor;
 
 namespace Challenges
 {
@@ -58,10 +61,13 @@ namespace Challenges
     [CustomEditor(typeof(Updater))]
     public class Updater_Editor : Editor
     {
-        private string teacher;
-        private string search;
-        private static List<Status> challengeList = new List<Status>();
-        private static List<Status> filteredChallengeList = new List<Status>();
+        public static string teacher;
+        public static string search;
+        public static List<Status> challengeList = new List<Status>();
+        public static List<Status> filteredChallengeList = new List<Status>();
+
+        public const string amplifyURL = "https://samtechart.notion.site/Amplify-Shader-Editor-0e6b4796f90646a7b0d8aa2cf1f4a3b2?pvs=4";
+        public const string documentationURL = "https://samtechart.notion.site/Challenges-bff753d22b604363bceab8501c32bd4f?pvs=4";
 
         private static UpdaterStatus updaterStatus;
         private static string updaterErrorTitle;
@@ -69,23 +75,33 @@ namespace Challenges
         private static string updaterLoadingMessage;
         private static UnityWebRequest currentRequest;
 
-        private static Texture2D previewMask;
-        private static Shader previewShader;
-        private static Material previewMaterial;
+        public static OnStartLoading onStartLoading;
+        public static OnIOActionDone onStopLoading;
+        public delegate void OnStartLoading(string message);
+
+        public static OnIOActionDone onCacheUpdated;
+        public static OnIOActionDone onCacheLoaded;
+        public static OnIOActionDone onChallengeInfosDownloaded;
+        public delegate void OnIOActionDone();
+
+        public static Texture2D previewMask;
+        public static Shader previewShader;
+        public static Material previewMaterial;
+
 
         //Styles
-        private GUIStyle titleStyle;
-        private GUIStyle centredtitleStyle;
-        private GUIStyle descriptionStyle;
-        private GUIContent validIcon;
-        private GUIContent minorUpdateIcon;
-        private GUIContent majorUpdateIcon;
-        private GUIContent newIcon;
-        private GUIContent depreciatedIcon;
-        private GUIContent refreshIcon;
-        private bool stylesLoaded;
+        private static GUIStyle titleStyle;
+        private static GUIStyle centredtitleStyle;
+        private static GUIStyle descriptionStyle;
+        private static GUIContent validIcon;
+        private static GUIContent minorUpdateIcon;
+        private static GUIContent majorUpdateIcon;
+        private static GUIContent newIcon;
+        private static GUIContent depreciatedIcon;
+        private static GUIContent refreshIcon;
+        private static bool stylesLoaded;
 
-        private string cacheDir { get => "Temp/ChallengesUpdater"; }
+        private static string cacheDir { get => "Temp/ChallengesUpdater"; }
 
         private static string onlineVersion;
         private static string localVersion;
@@ -95,7 +111,8 @@ namespace Challenges
 
         private void OnEnable()
         {
-            teacher = EditorPrefs.GetString(TutoPack_Selector.lastTeacherPrefKey, "");
+            onCacheUpdated += OnCacheUpdated;
+            onStartLoading += OpenLoadingBar;
 
             LoadResources();
             LoadCache();
@@ -106,7 +123,13 @@ namespace Challenges
             DestroyImmediate(target);
         }
 
-        private void LoadStyles()
+        private void OpenLoadingBar(string message)
+        {
+            updaterStatus = UpdaterStatus.Loading;
+            updaterLoadingMessage = message;
+        }
+
+        public static void LoadStyles()
         {
             titleStyle = new GUIStyle(EditorStyles.largeLabel);
             titleStyle.fontSize = 20;
@@ -117,6 +140,13 @@ namespace Challenges
             descriptionStyle = new GUIStyle(EditorStyles.largeLabel);
             descriptionStyle.wordWrap = true;
 
+            LoadIcons();
+
+            stylesLoaded = true;
+        }
+
+        public static void LoadIcons()
+        {
             validIcon = EditorGUIUtility.IconContent("d_Progress@2x");
             validIcon.tooltip = "All good";
             minorUpdateIcon = EditorGUIUtility.IconContent("d_console.warnicon.inactive.sml@2x");
@@ -128,7 +158,6 @@ namespace Challenges
             depreciatedIcon = EditorGUIUtility.IconContent("d_console.erroricon");
             depreciatedIcon.tooltip = "This challenge is deprecated, it will not be updated anymore.";
             refreshIcon = EditorGUIUtility.IconContent("Refresh@2x");
-            stylesLoaded = true;
         }
 
         public override bool UseDefaultMargins()
@@ -146,12 +175,7 @@ namespace Challenges
             {
                 GenericMenu menu = new GenericMenu();
 
-                HashSet<string> teachers = new HashSet<string>();
-                foreach (var item in challengeList)
-                {
-                    if (!teachers.Contains(item.teacher))
-                        teachers.Add(item.teacher);
-                }
+                HashSet<string> teachers = GetTeachers();
 
                 menu.AddItem(new GUIContent("All"), string.IsNullOrEmpty(teacher), () => { SelectTeacher(""); });
                 menu.AddSeparator("");
@@ -206,11 +230,24 @@ namespace Challenges
                     menu.AddItem(new GUIContent("Export a new Updater version"), false, () => { GenerateUpdaterInfo(true); });
                     menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
                     menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateUpdaterInfo(false); ExportAllChallenges(); });
+                    menu.AddSeparator("");
+                    menu.AddItem(new GUIContent("Publish everthing"), false, () => { GenerateReadme(); GenerateUpdaterInfo(false); ExportAllChallenges(); });
                 }
 
                 menu.DropDown(rect);
             }
             GUILayout.EndHorizontal();
+        }
+
+        public static HashSet<string> GetTeachers()
+        {
+            HashSet<string> teachers = new HashSet<string>();
+            foreach (var item in challengeList)
+            {
+                if (!teachers.Contains(item.teacher))
+                    teachers.Add(item.teacher);
+            }
+            return teachers;
         }
 
         public override void OnInspectorGUI()
@@ -257,7 +294,6 @@ namespace Challenges
                     GUI.Label(descriptionRect, localVersion, descriptionStyle);
                     if (GUI.Button(buttonRect, "Check updates"))
                     {
-                        updaterStatus = UpdaterStatus.Loading;
                         ChallengesUpdaterIsOutdated(OnGetUpdaterVersion);
                     }
                     break;
@@ -334,7 +370,7 @@ namespace Challenges
             if (status.preview != null)
             {
                 Rect previewRect = new Rect(rect.x + rect.width - (rect.height - 1) * 2 - 1, rect.y + 1, (rect.height - 1) * 2, rect.height - 2);
-                previewMaterial.SetInt("_ColorSpace", (int) PlayerSettings.colorSpace);
+                previewMaterial.SetInt("_ColorSpace", (int)PlayerSettings.colorSpace);
                 EditorGUI.DrawPreviewTexture(previewRect, status.preview, previewMaterial);
             }
 
@@ -410,7 +446,7 @@ namespace Challenges
             }
         }
 
-        private void OnCacheUpdated()
+        public static void OnCacheUpdated()
         {
             LoadCache();
             updaterStatus = UpdaterStatus.Valid;
@@ -473,11 +509,8 @@ namespace Challenges
             Debug.Log("Updater Git Status\n" + cmd.StandardOutput.ReadToEnd());
         }
 
-        private static void DownloadUpdaterIndex(System.Action<UpdaterInfo> onUpdaterIndexDownloaded)
+        public static void DownloadUpdaterIndex(Action<UpdaterInfo> onUpdaterIndexDownloaded)
         {
-            //Set loading status
-            updaterStatus = UpdaterStatus.Loading;
-
             //Download project infos
             string uri = $"{Updater.gitDownloadUrl}/Index.json";
             DownloadFile(uri, (DownloadHandler handler) =>
@@ -487,11 +520,12 @@ namespace Challenges
             });
         }
 
-        private static void ChallengesUpdaterIsOutdated(System.Action<bool> outdated)
+        public static void ChallengesUpdaterIsOutdated(Action<bool> outdated)
         {
+            onStartLoading?.Invoke("Check the Updater Version");
+
             //Check updater version
             UnityPackage currentPackage = UnityPackage.FindForAssembly(Assembly.GetExecutingAssembly());
-            updaterLoadingMessage = "Check the Updater Version";
 
             //The plugin exist in the assets and not the package manager.
             //So it should always be up to date or updated by git and not the package manager.
@@ -520,9 +554,9 @@ namespace Challenges
             }
         }
 
-        private static void UpdateTheUpdater()
+        public static void UpdateTheUpdater()
         {
-            updaterLoadingMessage = "Update the Challenges Updater";
+            onStartLoading?.Invoke("Update the Challenges Updater");
 
             //Check if the plugin exist in package (and not in the project assets)
             string filePath = GetFilePath().Replace('\\', '/');
@@ -541,8 +575,10 @@ namespace Challenges
             EditorUtility.ClearProgressBar();
         }
 
-        private static void LoadResources()
+        public static void LoadResources()
         {
+            teacher = EditorPrefs.GetString(TutoPack_Selector.lastTeacherPrefKey, "");
+
             //Get data directory
             string dataPath = GetFilePath().Replace($"{nameof(Updater)}.cs", "Data\\");
 
@@ -608,7 +644,43 @@ namespace Challenges
             }
         }
 
-        private void ReimportChallenge(string name)
+        public static Texture2D GetStatusIcon(ChallengeStatus status)
+        {
+            switch (status)
+            {
+                case ChallengeStatus.Good:
+                    return validIcon.image as Texture2D;
+                case ChallengeStatus.MinorUpdate:
+                    return minorUpdateIcon.image as Texture2D;
+                case ChallengeStatus.MajorUpdate:
+                    return majorUpdateIcon.image as Texture2D;
+                case ChallengeStatus.New:
+                    return newIcon.image as Texture2D;
+                case ChallengeStatus.Deprecated:
+                    return depreciatedIcon.image as Texture2D;
+            }
+            return null;
+        }
+
+        public static string GetStatusTooltip(ChallengeStatus status)
+        {
+            switch (status)
+            {
+                case ChallengeStatus.Good:
+                    return validIcon.tooltip;
+                case ChallengeStatus.MinorUpdate:
+                    return minorUpdateIcon.tooltip;
+                case ChallengeStatus.MajorUpdate:
+                    return majorUpdateIcon.tooltip;
+                case ChallengeStatus.New:
+                    return newIcon.tooltip;
+                case ChallengeStatus.Deprecated:
+                    return depreciatedIcon.tooltip;
+            }
+            return null;
+        }
+
+        public static void ReimportChallenge(string name)
         {
             switch (EditorUtility.DisplayDialogComplex("Reimport Challenge",
                 "This will overwrite existing assets and erase your progress on the challenge. Are you sure you want to continue?",
@@ -626,7 +698,7 @@ namespace Challenges
             }
         }
 
-        private void UpdateChallenge(string name, bool needConfirmation = false)
+        public static void UpdateChallenge(string name, bool needConfirmation = false)
         {
             if (needConfirmation)
             {
@@ -638,7 +710,7 @@ namespace Challenges
             }
         }
 
-        private void DeleteChallenge(string name, bool needConfirmation = false)
+        public static void DeleteChallenge(string name, bool needConfirmation = false)
         {
             if (needConfirmation)
             {
@@ -671,9 +743,9 @@ namespace Challenges
             }
         }
 
-        private static void DownloadFile(string uri, System.Action<DownloadHandler> callback)
+        private static void DownloadFile(string uri, Action<DownloadHandler> callback)
         {
-            EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", 0.0f);
+            //EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", 0.0f);
             currentRequest = UnityWebRequest.Get(uri);
             currentRequest.SetRequestHeader("authorization", Updater.gitToken);
             currentRequest.SendWebRequest().completed += WebRequestCompleted;
@@ -683,7 +755,7 @@ namespace Challenges
             {
                 UnityWebRequest request = (obj as UnityWebRequestAsyncOperation).webRequest;
                 EditorApplication.update -= TrackRequestProgress;
-                EditorUtility.ClearProgressBar();
+                //EditorUtility.ClearProgressBar();
 
                 if (LogErrorIfAny(request))
                     return;
@@ -694,7 +766,7 @@ namespace Challenges
             }
         }
 
-        private void DownloadPackage(string uri, bool manualImport = false)
+        public static void DownloadPackage(string uri, bool manualImport = false)
         {
             DownloadFile(uri, (DownloadHandler handler) =>
             {
@@ -710,12 +782,12 @@ namespace Challenges
             });
         }
 
-        private void DownloadChallenge(string name, bool manualImport = false)
+        public static void DownloadChallenge(string name, bool manualImport = false)
         {
             DownloadPackage($"{Updater.gitDownloadUrl}/Challenges/{name}.unitypackage", manualImport);
         }
 
-        private void ImportPackageCompleted(string packageName)
+        public static void ImportPackageCompleted(string packageName)
         {
             AssetDatabase.importPackageCompleted -= ImportPackageCompleted;
             AssetDatabase.importPackageFailed -= ImportPackageFailed;
@@ -723,7 +795,7 @@ namespace Challenges
             LoadCache();
         }
 
-        private void ImportPackageFailed(string packageName, string error)
+        public static void ImportPackageFailed(string packageName, string error)
         {
             AssetDatabase.importPackageCompleted -= ImportPackageCompleted;
             AssetDatabase.importPackageFailed -= ImportPackageFailed;
@@ -731,7 +803,7 @@ namespace Challenges
             LoadCache();
         }
 
-        private void ImportPackageCancelled(string packageName)
+        public static void ImportPackageCancelled(string packageName)
         {
             AssetDatabase.importPackageCompleted -= ImportPackageCompleted;
             AssetDatabase.importPackageFailed -= ImportPackageFailed;
@@ -739,7 +811,7 @@ namespace Challenges
             LoadCache();
         }
 
-        private void OpenChallenge(string name)
+        public static void OpenChallenge(string name)
         {
             string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
             TutoPack pack = tutoPackGUIDs.ToList().
@@ -748,15 +820,13 @@ namespace Challenges
             Selection.activeObject = pack;
 
             Scene existingScene = EditorSceneManager.GetSceneByName(name);
-            if (existingScene.name == name)
+            if (existingScene.name != name)
             {
-                return;
-            }
-
-            if (pack.scene != null && pack.scene is SceneAsset scene)
-            {
-                EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
-                EditorSceneManager.OpenScene(AssetDatabase.GetAssetPath(pack.scene), OpenSceneMode.Single);
+                if (pack.scene != null && pack.scene is SceneAsset scene)
+                {
+                    EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+                    EditorSceneManager.OpenScene(AssetDatabase.GetAssetPath(pack.scene), OpenSceneMode.Single);
+                }
             }
 
             if (!string.IsNullOrEmpty(pack.onOpen))
@@ -783,7 +853,7 @@ namespace Challenges
             }
         }
 
-        private void PingChallenge(string name)
+        public static void PingChallenge(string name)
         {
             string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
             EditorGUIUtility.PingObject(tutoPackGUIDs.ToList().
@@ -791,7 +861,7 @@ namespace Challenges
                 FirstOrDefault(x => x.name == name));
         }
 
-        private void GenerateUpdaterInfo(bool incrementVersion)
+        public static void GenerateUpdaterInfo(bool incrementVersion)
         {
             //Load info from package json file (Unity formating)
             string filePath = GetFilePath();
@@ -842,7 +912,7 @@ namespace Challenges
             EditorUtility.ClearProgressBar();
         }
 
-        private void GenerateReadme()
+        public static void GenerateReadme()
         {
             string[] tutoPackGUIDs = AssetDatabase.FindAssets("t:TutoPack");
             List<TutoPack> packs = tutoPackGUIDs.ToList().
@@ -877,16 +947,16 @@ namespace Challenges
             File.WriteAllText(directory + "Readme.md", file);
         }
 
-        private void CheckCacheDirectories()
+        public static void CheckCacheDirectories()
         {
             if (!Directory.Exists(cacheDir))
                 Directory.CreateDirectory(cacheDir);
         }
 
-        private void LoadCache()
+        public static void LoadCache()
         {
             CheckCacheDirectories();
-            updaterLoadingMessage = "Load the local cache";
+            onStartLoading?.Invoke("Load the local cache");
 
             //Read all challenge infos
             Dictionary<string, ChallengeInfo> infos = new Dictionary<string, ChallengeInfo>();
@@ -959,12 +1029,15 @@ namespace Challenges
                 challengeList.Add(new Status(item.Value, ChallengeStatus.Deprecated));
 
             UpdateFilteredStatus();
+
+            onStopLoading?.Invoke();
+            onCacheLoaded?.Invoke();
         }
 
-        private void UpdateCache()
+        public static void UpdateCache()
         {
-            updaterStatus = UpdaterStatus.Loading;
-            updaterLoadingMessage = "Update the local cache";
+            onStartLoading?.Invoke("Update the local cache");
+
             List<ChallengeInfo> infos = new List<ChallengeInfo>();
             CheckCacheDirectories();
 
@@ -1014,21 +1087,22 @@ namespace Challenges
                     gitChallenges[challengeName].AddElement(elements[i]);
                 }
 
-                DownloadChallengeInfos(toDownload, OnCacheUpdated);
+                DownloadChallengeInfos(toDownload);
             }
 
             //Act like a loop iterating on gitChallenges
-            void DownloadChallengeInfos(Queue<GitChallenge> gitChallenges, System.Action endCallback)
+            void DownloadChallengeInfos(Queue<GitChallenge> gitChallenges)
             {
                 if (gitChallenges.Count == 0)
                 {
-                    endCallback.Invoke();
+                    onStopLoading.Invoke();
+                    onChallengeInfosDownloaded?.Invoke();
                     return;
                 }
 
                 GitChallenge gitChallenge = gitChallenges.Dequeue();
+                onStartLoading?.Invoke($"Check {gitChallenge.info.name}");
 
-                updaterLoadingMessage = $"Check {gitChallenge.info.name}";
                 DownloadFile(gitChallenge.info.download_url, (DownloadHandler handler) =>
                 {
                     //Read downloaded file
@@ -1059,12 +1133,12 @@ namespace Challenges
                     File.WriteAllText(infoFilePath, JsonUtility.ToJson(downloaded));
 
                     //Download next challenge
-                    DownloadChallengeInfos(gitChallenges, endCallback);
+                    DownloadChallengeInfos(gitChallenges);
                 });
             }
         }
 
-        private void UpdateFilteredStatus()
+        public static void UpdateFilteredStatus()
         {
             filteredChallengeList.Clear();
 
@@ -1097,10 +1171,132 @@ namespace Challenges
                 EditorApplication.update -= TrackRequestProgress;
             }
 
-            EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", currentRequest.downloadProgress);
+            //EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", currentRequest.downloadProgress);
         }
 
-        private struct Status
+        public static void GetNotifications(List<NotificationInfo> notifications, bool includeDismiss)
+        {
+            CheckAssemblies(out bool hasAmplify, out bool hasURP);
+
+            bool URPGraphicSettings = GraphicsSettings.currentRenderPipeline != null && GraphicsSettings.currentRenderPipeline.GetType().ToString().StartsWith("UnityEngine.Rendering.Universal");
+            bool URPQualitySettings = QualitySettings.renderPipeline != null && QualitySettings.renderPipeline.GetType().ToString().StartsWith("UnityEngine.Rendering.Universal");
+
+
+            //Check Amplify
+            if (!hasAmplify)
+            {
+                NotificationInfo missingAmplify = new NotificationInfo(
+                    "Amplify Shader Editor",
+                    "Le plugin Amplify Shader Editor n'a pas été trouvé sur le projet. La plupart des challenges utilisent ce plugin. Il est donc recommandé de le télécharger et de l'importer dans le projet.\n<i>Assets > Import Package > Custom Package...</i>",
+                    "Download Amplify",
+                    DownloadAmplify
+                    );
+
+                if (includeDismiss || !NotificationIsDismiss(missingAmplify))
+                    notifications.Add(missingAmplify);
+            }
+
+            //Check URP
+            if (!hasURP)
+            {
+                NotificationInfo missingURP = new NotificationInfo(
+                    "Universal Rendering Pipeline (URP)",
+                    "Le package URP ne semble pas être sur le projet. Les challenges sont fait pour tourner sur l'URP. Créez un nouvez projet en URP ou utiliser le bouton ci-dessous pour ajouter l'URP au projet.",
+                    "Install URP",
+                    DownloadURP
+                    );
+
+                if (includeDismiss || !NotificationIsDismiss(missingURP))
+                    notifications.Add(missingURP);
+            }
+
+            else
+            {
+                if (!URPGraphicSettings)
+                {
+                    NotificationInfo badURPGraphicsSettings = new NotificationInfo(
+                            "URP - Graphics Settings",
+                        "Le package URP est sur le projet mais n'est pas activé dans les Graphics Settings.\nAssignez un RenderPipeline dans les Graphics Settings pour corriger ce problème.",
+                        "Graphics Settings",
+                        () => SettingsService.OpenProjectSettings("Project/Graphics")
+                    );
+
+                    if (includeDismiss || !NotificationIsDismiss(badURPGraphicsSettings))
+                        notifications.Add(badURPGraphicsSettings);
+
+                }
+
+                if (!URPQualitySettings)
+                {
+                    NotificationInfo badURPQualitySettings = new NotificationInfo(
+                            "URP - Quality Settings",
+                        "Le package URP est sur le projet mais n'est pas activé dans les Quality Settings.\nAssignez un RenderPipeline dans les Quality Settings pour corriger ce problème.",
+                        "Quality Settings",
+                        () => SettingsService.OpenProjectSettings("Project/Quality")
+                    );
+
+                    if (includeDismiss || !NotificationIsDismiss(badURPQualitySettings))
+                        notifications.Add(badURPQualitySettings);
+                }
+            }
+
+            //Check Git
+
+            if (includeDismiss)
+            {
+                for (int i = 0; i < notifications.Count; i++)
+                    RestoreDismissNotification(notifications[i]);
+            }
+        }
+
+        public static void DismissNotification(NotificationInfo notification)
+        {
+            EditorPrefs.SetBool($"Challenges.DismissNotifactions.{notification.title}", true);
+        }
+
+        public static bool NotificationIsDismiss(NotificationInfo notification)
+        {
+            return EditorPrefs.GetBool($"Challenges.DismissNotifactions.{notification.title}", false);
+        }
+
+        public static void RestoreDismissNotification(NotificationInfo notification)
+        {
+            EditorPrefs.SetBool($"Challenges.DismissNotifactions.{notification.title}", false);
+        }
+
+        public static void OpenDocumentation()
+        {
+            Application.OpenURL(documentationURL);
+        }
+
+        public static void DownloadAmplify()
+        {
+            Application.OpenURL(amplifyURL);
+        }
+
+        public static void DownloadURP()
+        {
+            UnityEditor.PackageManager.UI.Window.Open("com.unity.render-pipelines.universal");
+        }
+
+        public static void CheckAssemblies(out bool hasAmplify, out bool hasURP)
+        {
+            hasAmplify = false;
+            hasURP = false;
+
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                string name = assembly.GetName().Name;
+
+                switch (name)
+                {
+                    case "AmplifyShaderEditor": hasAmplify = true; break;
+                    case "Unity.RenderPipelines.Universal.Runtime": hasURP = true; break;
+                }
+            }
+        }
+
+        public struct Status
         {
             public TutoPack pack;
             public string name;
@@ -1133,7 +1329,7 @@ namespace Challenges
             }
         }
 
-        private class GitChallenge
+        public class GitChallenge
         {
             public GitElement unityPackage;
             public GitElement info;
@@ -1150,8 +1346,8 @@ namespace Challenges
             }
         }
 
-        [System.Serializable]
-        private struct GitElement
+        [Serializable]
+        public struct GitElement
         {
             public string name;
             public string path;
@@ -1168,7 +1364,7 @@ namespace Challenges
             public bool isJson { get => isFile && name.EndsWith(".json"); }
         }
 
-        private enum ChallengeStatus
+        public enum ChallengeStatus
         {
             Good,
             MinorUpdate,
@@ -1177,7 +1373,7 @@ namespace Challenges
             Deprecated
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct UpdaterInfo
         {
             public string name;
@@ -1185,10 +1381,11 @@ namespace Challenges
             public string version;
             public string unity;
             public string description;
+            public string unityVersion;
             public AuthorInfo author;
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct AuthorInfo
         {
             public string name;
@@ -1196,7 +1393,7 @@ namespace Challenges
             public string url;
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct ChallengeInfo
         {
             public string name;
@@ -1221,7 +1418,23 @@ namespace Challenges
             }
         }
 
-        private enum UpdaterStatus
+        public struct NotificationInfo
+        {
+            public string title;
+            public string message;
+            public string actionName;
+            public Action action;
+
+            public NotificationInfo(string title, string message, string actionName, Action action)
+            {
+                this.title = title;
+                this.message = message;
+                this.actionName = actionName;
+                this.action = action;
+            }
+        }
+
+        public enum UpdaterStatus
         {
             Valid,
             Loading,
@@ -1242,7 +1455,7 @@ namespace Challenges
             wrapper.array = array;
             return JsonUtility.ToJson(wrapper);
         }
-        [System.Serializable]
+        [Serializable]
         private class Wrapper<T>
         {
             public T[] array;

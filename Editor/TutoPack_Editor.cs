@@ -11,6 +11,8 @@ using UnityEngine.Video;
 using UnityEditorInternal;
 using ChallengeInfo = Challenges.Updater_Editor.ChallengeInfo;
 using Debug = UnityEngine.Debug;
+using UnityEngine.UIElements;
+using UnityEditor.UIElements;
 
 namespace Challenges
 {
@@ -50,6 +52,116 @@ namespace Challenges
     [CustomEditor(typeof(TutoPack))]
     public class TutoPack_Editor : Editor
     {
+        private TutoPack challenge;
+
+        //New GUI
+        public override VisualElement CreateInspectorGUI()
+        {
+            challenge = target as TutoPack;
+            VisualElement root = new VisualElement();
+
+            GenerateHeader(root);
+            //GenerateUserContent(root);
+            GenerateDevContent(root);
+
+            return root;
+        }
+
+        private void GenerateHeader(VisualElement root)
+        {
+            //Cover
+            if (challenge.preview != null)
+            {
+                VisualElement cover = new VisualElement();
+                cover.style.backgroundColor = new Color(0, 0, 0, 0.2f);
+                cover.style.backgroundImage = challenge.preview;
+                cover.style.position = Position.Absolute;
+                cover.style.top = cover.style.left = cover.style.right = 0;
+                cover.style.height = 80;
+                cover.style.borderBottomColor = new Color(0, 0, 0, 0.6f);
+                cover.style.borderBottomWidth = 1.0f;
+                cover.style.backgroundSize = new StyleBackgroundSize(new BackgroundSize(BackgroundSizeType.Cover));
+                root.Add(cover);
+            }
+
+            //Title
+            TextElement title = new TextElement();
+            title.text = challenge.name;
+            title.style.fontSize = 22;
+            title.style.left = 10;
+            title.style.top = 10;
+            title.style.marginBottom = 60;
+            root.Add(title);
+        }
+
+        private void GenerateUserContent(VisualElement root)
+        {
+            //Description
+            TextElement description = new TextElement();
+            description.text = challenge.description;
+            description.style.opacity = 0.7f;
+            description.style.fontSize = 14;
+            description.SetMargin(3, 10, 10, 3);
+            root.Add(description);
+
+            //Open in challenges
+            Button openBtn = GenerateRoundButton("Open in Challenge Window");
+            openBtn.clicked += () => Challenges.Open(challenge);
+            root.Add(openBtn);
+        }
+
+        private void GenerateDevContent(VisualElement root)
+        {
+            VisualElement container = new VisualElement();
+            container.SetPadding(0, 10, 10, 0);
+            root.Add(container);
+
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.parent))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.priority))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.description))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.preview))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.hidden))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.teacher))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.tags))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.scene))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.onOpen))));
+
+            VisualElement commands = new VisualElement();
+            commands.style.marginTop = 10;
+            commands.style.flexDirection = FlexDirection.Row;
+            commands.style.flexGrow = 1;
+
+            Button openBtn = GenerateRoundButton("Open in Challenge Window");
+            openBtn.clicked += () => Challenges.Open(challenge);
+            commands.Add(openBtn);
+
+            Button publish = GenerateRoundButton("Publish");
+            publish.clicked += OnPublish;
+            commands.Add(publish);
+
+            root.Add(commands);
+        }
+
+        Button GenerateRoundButton(string text)
+        {
+            Button btn = new Button();
+            btn.text = text;
+            btn.style.flexGrow = 1;
+            btn.SetBorder(1, 10, new Color(0.0f, 0.0f, 0.0f, 0.6f));
+            btn.SetMargin(3, 10, 10, 3);
+            btn.style.height = 25;
+            return btn;
+        }
+
+
+
+
+
+
+
+
+
+
         private static bool editTuto;
         private static bool editInfos;
         private int page
@@ -884,6 +996,7 @@ namespace Challenges
             GUILayout.Label("Hash : " + pack.hash?.ToString());
             EditorGUILayout.PropertyField(targetObject.FindProperty("hidden"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("teacher"));
+            EditorGUILayout.PropertyField(targetObject.FindProperty("parent"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("scene"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("onOpen"));
             EditorGUILayout.PropertyField(targetObject.FindProperty("tags"));
@@ -1491,5 +1604,141 @@ namespace Challenges
         {
             Updater.Open();
         }
+    }
+
+
+    [CustomEditor(typeof(ChallengeElementContainer))]
+    public class ChallengeElementContainerEditor : Editor
+    {
+        private ChallengeElementContainer container;
+        private PropertyField textField;
+        private PropertyField altTextField;
+        private PropertyField paddingField;
+        private PropertyField objectField;
+        private VisualElement preview;
+
+        public override VisualElement CreateInspectorGUI()
+        {
+            container = target as ChallengeElementContainer;
+            SerializedProperty page = serializedObject.FindProperty(nameof(container.page));
+            SerializedProperty content = page.FindPropertyRelative(nameof(container.page.content)).GetArrayElementAtIndex(container.contentID);
+
+            VisualElement root = new VisualElement();
+
+            //Type field
+            PropertyField typeField = new PropertyField(content.FindPropertyRelative("type"));
+            typeField.RegisterValueChangeCallback(OnTypeChange);
+            typeField.RegisterValueChangeCallback(OnChange);
+            root.Add(typeField);
+
+            textField = new PropertyField(content.FindPropertyRelative("text"));
+            textField.RegisterValueChangeCallback(OnChange);
+            root.Add(textField);
+
+            altTextField = new PropertyField(content.FindPropertyRelative("altText"));
+            altTextField.RegisterValueChangeCallback(OnChange);
+            root.Add(altTextField);
+
+            objectField = new PropertyField(content.FindPropertyRelative("obj"));
+            objectField.RegisterValueChangeCallback(OnChange);
+            root.Add(objectField);
+
+            paddingField = new PropertyField(content.FindPropertyRelative("padding"));
+            paddingField.RegisterValueChangeCallback(OnChange);
+            root.Add(paddingField);
+
+            OnTypeChange(null);
+
+            root.Add(Challenges.BuildElement(new TutoPage.Content() { type = TutoPage.Type.Separator }));
+
+            preview = new VisualElement();
+            root.Add(preview);
+
+            return root;
+        }
+
+        private void OnChange(SerializedPropertyChangeEvent e)
+        {
+            if (container.page == null)
+                return;
+
+            //Update challenges window view
+            Challenges.onEditElement?.Invoke(container.page, container.contentID);
+
+            //Update preview
+            preview.Clear();
+            preview.Add(Challenges.BuildElement(container.page.content[container.contentID]));
+        }
+
+        private void SetVisibility(bool text, bool altText, bool obj, bool padding)
+        {
+            textField.style.display = text ? DisplayStyle.Flex : DisplayStyle.None;
+            altTextField.style.display = altText ? DisplayStyle.Flex : DisplayStyle.None;
+            objectField.style.display = obj ? DisplayStyle.Flex : DisplayStyle.None;
+            paddingField.style.display = padding ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void OnTypeChange(SerializedPropertyChangeEvent e)
+        {
+            switch (container.page.content[container.contentID].type)
+            {
+                case TutoPage.Type.Title:
+                case TutoPage.Type.Subtitle:
+                case TutoPage.Type.Hint:
+                    SetVisibility(true, false, false, false);
+                    break;
+
+                case TutoPage.Type.Text:
+                    SetVisibility(true, false, true, false);
+                    break;
+
+                case TutoPage.Type.Link:
+                    SetVisibility(true, true, false, false);
+                    break;
+
+                case TutoPage.Type.Button:
+                    SetVisibility(true, false, true, false);
+                    break;
+
+                case TutoPage.Type.Space:
+                    SetVisibility(false, false, false, true);
+                    break;
+
+                case TutoPage.Type.Code:
+                    SetVisibility(true, true, false, false);
+                    break;
+
+                case TutoPage.Type.Shader:
+                    SetVisibility(false, false, true, false);
+                    break;
+
+                case TutoPage.Type.Separator:
+                    SetVisibility(false, false, false, false);
+                    break;
+
+                case TutoPage.Type.Image:
+                    SetVisibility(false, false, true, false);
+                    break;
+
+                case TutoPage.Type.Video:
+                    SetVisibility(true, false, true, false);
+                    break;
+
+                case TutoPage.Type.LinkToChallenge:
+                    SetVisibility(true, true, false, false);
+                    break;
+
+                case TutoPage.Type.BeginFoldout:
+                    SetVisibility(true, false, false, false);
+                    break;
+
+                case TutoPage.Type.BeginCallout:
+                case TutoPage.Type.EndCallout:
+                case TutoPage.Type.EndFoldout:
+                    SetVisibility(false, false, false, false);
+                    break;
+            }
+        }
+
     }
 }
