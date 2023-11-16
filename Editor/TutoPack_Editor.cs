@@ -116,14 +116,14 @@ namespace Challenges
             container.SetPadding(0, 10, 10, 0);
             root.Add(container);
 
-            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.parent))));
-            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.priority))));
-            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.description))));
-            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.preview))));
             container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.hidden))));
             container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.teacher))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.preview))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.description))));
             container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.tags))));
             container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.scene))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.parent))));
+            container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.priority))));
             container.Add(new PropertyField(serializedObject.FindProperty(nameof(challenge.onOpen))));
 
             VisualElement commands = new VisualElement();
@@ -1615,6 +1615,7 @@ namespace Challenges
         private PropertyField altTextField;
         private PropertyField paddingField;
         private PropertyField objectField;
+        private PropertyField colorField;
         private VisualElement preview;
 
         public override VisualElement CreateInspectorGUI()
@@ -1647,6 +1648,10 @@ namespace Challenges
             paddingField.RegisterValueChangeCallback(OnChange);
             root.Add(paddingField);
 
+            colorField = new PropertyField(content.FindPropertyRelative("color"));
+            colorField.RegisterValueChangeCallback(OnChange);
+            root.Add(colorField);
+
             OnTypeChange(null);
 
             root.Add(Challenges.BuildElement(new TutoPage.Content() { type = TutoPage.Type.Separator }));
@@ -1670,12 +1675,13 @@ namespace Challenges
             preview.Add(Challenges.BuildElement(container.page.content[container.contentID]));
         }
 
-        private void SetVisibility(bool text, bool altText, bool obj, bool padding)
+        private void SetVisibility(bool text, bool altText, bool obj, bool padding, bool color = false)
         {
             textField.style.display = text ? DisplayStyle.Flex : DisplayStyle.None;
             altTextField.style.display = altText ? DisplayStyle.Flex : DisplayStyle.None;
             objectField.style.display = obj ? DisplayStyle.Flex : DisplayStyle.None;
             paddingField.style.display = padding ? DisplayStyle.Flex : DisplayStyle.None;
+            colorField.style.display = color ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private void OnTypeChange(SerializedPropertyChangeEvent e)
@@ -1713,7 +1719,7 @@ namespace Challenges
                     break;
 
                 case TutoPage.Type.Separator:
-                    SetVisibility(false, false, false, false);
+                    SetVisibility(true, false, false, false);
                     break;
 
                 case TutoPage.Type.Image:
@@ -1732,10 +1738,14 @@ namespace Challenges
                     SetVisibility(true, false, false, false);
                     break;
 
-                case TutoPage.Type.BeginCallout:
                 case TutoPage.Type.EndCallout:
                 case TutoPage.Type.EndFoldout:
                     SetVisibility(false, false, false, false);
+                    break;
+
+                case TutoPage.Type.BeginCallout:
+                case TutoPage.Type.Icon:
+                    SetVisibility(true, true, false, false, true);
                     break;
             }
         }

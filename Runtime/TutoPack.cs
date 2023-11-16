@@ -6,7 +6,6 @@ using UnityEngine.UIElements;
 
 namespace Challenges
 {
-    [CreateAssetMenu(menuName = "Tuto pack", order = 51), System.Serializable]
     public class TutoPack : ScriptableObject
     {
         public TutoPack parent;
@@ -67,6 +66,7 @@ namespace Challenges
             public string altText;
             public int padding;
             public Object obj;
+            public Color color;
 
             public Hash128 GetHash()
             {
@@ -98,6 +98,7 @@ namespace Challenges
             EndCallout,
             BeginFoldout,
             EndFoldout,
+            Icon,
         }
 
         public enum Container

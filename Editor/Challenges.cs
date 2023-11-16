@@ -13,6 +13,7 @@ using UnityEngine.Video;
 using MenuStatus = UnityEngine.UIElements.DropdownMenuAction.Status;
 using Cursor = UnityEngine.UIElements.Cursor;
 using Object = UnityEngine.Object;
+using UnityEngine.Networking;
 
 namespace Challenges
 {
@@ -35,6 +36,24 @@ namespace Challenges
             Challenges window = GetWindow<Challenges>();
             window.titleContent = new GUIContent("Challenges");
             window.Show();
+        }
+
+        [MenuItem("Edit/Switch Challenges to Edit Mode %e", priority = 150)]
+        public static void SwitchToEditMode()
+        {
+            Challenges challenges = focusedWindow as Challenges;
+            if (challenges == null)
+                return;
+
+            bool editMode = EditorPrefs.GetBool(developerModePrefName, developerModeDefaultValue);
+            EditorPrefs.SetBool(developerModePrefName, !editMode);
+            challenges.Refresh();
+        }
+
+        [MenuItem("Edit/Switch Challenges to Edit Mode %e", validate = true)]
+        public static bool SwitchToEditModeValidate()
+        {
+            return focusedWindow is Challenges;
         }
 
         public static void Open(TutoPack challenge)
@@ -90,9 +109,6 @@ namespace Challenges
             notifications = new ChallengeNotifications(this);
             root.Add(notifications);
 
-            OpenPage(selectionPage);
-
-
             //Bind callbacks and start the process
             BindCallbacks();
             Updater_Editor.LoadCache();
@@ -127,6 +143,16 @@ namespace Challenges
             Updater_Editor.onStopLoading += updateToolbar.Stop;
             Updater_Editor.onCacheUpdated += OnCacheUpdated;
             Updater_Editor.onCacheLoaded += OnCacheLoaded;
+        }
+
+        public void Refresh()
+        {
+            if (challengePage.style.display == DisplayStyle.Flex)
+                challengePage.RefreshPage();
+            if (selectionPage.style.display == DisplayStyle.Flex)
+                selectionPage.Refresh();
+            if (preferencePage.style.display == DisplayStyle.Flex)
+                preferencePage.Refresh();
         }
 
         private void OpenPage(VisualElement page)
@@ -235,6 +261,7 @@ namespace Challenges
         public void OnCacheLoaded()
         {
             updateToolbar.Stop();
+            OpenPage(selectionPage);
         }
 
         public static void SetCursor(VisualElement element, MouseCursor cursor)
@@ -262,6 +289,41 @@ namespace Challenges
                                     callout.SetMargin(0, 0, 0, 10);
                                     callout.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f, 1.0f);
                                     callout.SetBorderRadius(10, 10, 0, 0);
+
+                                    VisualElement horizontal = null;
+                                    if (!string.IsNullOrEmpty(content.altText) || !string.IsNullOrEmpty(content.text))
+                                    {
+                                        horizontal = new VisualElement();
+                                        horizontal.name = "Horizontal";
+                                        horizontal.style.flexDirection = FlexDirection.Row;
+                                        callout.Add(horizontal);
+                                    }
+
+                                    //Icon
+                                    if (!string.IsNullOrEmpty(content.altText))
+                                    {
+                                        VisualElement icon = new VisualElement();
+                                        icon.name = "Icon";
+                                        icon.style.width = 32;
+                                        icon.style.height = 32;
+                                        icon.style.unityBackgroundImageTintColor = content.color;
+                                        icon.SetMargin(0, -3, 5, -3);
+                                        callout.style.paddingLeft = 46;
+                                        horizontal.style.marginLeft = -34;
+                                        horizontal.Add(icon);
+                                        Updater_Editor.DownloadFile(content.altText, (DownloadHandler dh) => GetOnlineIcon(icon, dh), true);
+                                    }
+
+                                    //Title
+                                    if (!string.IsNullOrEmpty(content.text))
+                                    {
+                                        TextElement title = new TextElement();
+                                        title.name = "Title";
+                                        title.style.fontSize = 24;
+                                        title.text = content.text;
+                                        horizontal.Add(title);
+                                    }
+
                                     return callout;
                                 }
 
@@ -308,7 +370,6 @@ namespace Challenges
 
                             default:
                                 return new TextElement() { text = "Exit container " };
-                                break;
                         }
                     }
                 default:
@@ -466,7 +527,7 @@ namespace Challenges
                     {
                         Foldout fold = new Foldout();
                         fold.style.backgroundColor = new Color(0.17f, 0.17f, 0.17f, 1.0f);
-                        fold.SetBorder(1, 5, new Color(0, 0, 0, 0.6f));
+                        fold.SetBorder(1, 10, new Color(0, 0, 0, 0.5f));
                         fold.text = content.altText;
                         fold.SetMargin(5, 0, 0, 5);
 
@@ -478,13 +539,16 @@ namespace Challenges
                         textElement.text = content.text;
                         textElement.style.backgroundColor = new Color(0.13f, 0.13f, 0.13f, 1.0f);
                         textElement.selection.isSelectable = true;
+                        textElement.SetBorderRadius(0, 0, 10, 10);
+                        textElement.style.borderTopColor = new Color(0, 0, 0, 0.4f);
+                        textElement.style.borderTopWidth = 1.0f;
                         fold.Add(textElement);
 
                         Button copyBtn = new Button();
                         copyBtn.style.backgroundImage = (Texture2D)EditorGUIUtility.IconContent("d_UnityEditor.ConsoleWindow").image;
                         copyBtn.style.position = Position.Absolute;
                         copyBtn.style.top = 2;
-                        copyBtn.style.right = -3;
+                        copyBtn.style.right = -2;
                         copyBtn.style.height = 16;
                         copyBtn.style.width = 16;
                         copyBtn.style.backgroundColor = Color.clear;
@@ -504,8 +568,8 @@ namespace Challenges
                         bool toggle = false;
 
                         VisualElement hint = new VisualElement();
-                        hint.style.borderBottomLeftRadius = hint.style.borderBottomRightRadius = hint.style.borderTopRightRadius = hint.style.borderTopLeftRadius = 7;
-                        hint.style.borderBottomColor = hint.style.borderTopColor = hint.style.borderLeftColor = hint.style.borderRightColor = new Color(0, 0, 0, 0.6f);
+                        hint.SetBorderRadius(10);
+                        hint.SetBorder(0, 10, new Color(0, 0, 0, 0.5f));
                         hint.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f, 1.0f);
                         hint.style.minHeight = 30;
                         hint.style.marginBottom = hint.style.marginTop = 5;
@@ -524,8 +588,7 @@ namespace Challenges
                         hintContent.style.fontSize = 13;
                         hintContent.style.opacity = 0.8f;
                         hintContent.style.visibility = Visibility.Hidden;
-
-                        hintContent.style.paddingBottom = hintContent.style.paddingLeft = hintContent.style.paddingRight = hintContent.style.paddingTop = 5;
+                        hintContent.SetPadding(5, 5, 5, 5);
 
                         float height = hintContent.resolvedStyle.height;
 
@@ -544,14 +607,14 @@ namespace Challenges
                                     hintMsg.style.visibility = Visibility.Hidden;
                                     hintContent.style.visibility = Visibility.Visible;
                                     hint.style.backgroundColor = Color.clear;
-                                    hint.style.borderBottomWidth = hint.style.borderTopWidth = hint.style.borderLeftWidth = hint.style.borderRightWidth = 1;
+                                    hint.SetBorderWidth(1);
                                 }
                                 else
                                 {
                                     hintMsg.style.visibility = Visibility.Visible;
                                     hintContent.style.visibility = Visibility.Hidden;
                                     hint.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f, 1.0f);
-                                    hint.style.borderBottomWidth = hint.style.borderTopWidth = hint.style.borderLeftWidth = hint.style.borderRightWidth = 0;
+                                    hint.SetBorderWidth(0);
                                 }
                                 toggle = !toggle;
                             }
@@ -576,15 +639,46 @@ namespace Challenges
 
                 case TutoPage.Type.Separator:
                     {
-                        VisualElement separator = new VisualElement();
-                        separator.style.height = 0;
-                        separator.style.borderTopWidth = 1;
-                        separator.style.borderBottomWidth = 1;
-                        separator.style.borderTopColor = new Color(0, 0, 0, 0.4f);
-                        separator.style.borderBottomColor = new Color(1, 1, 1, 0.2f);
-                        separator.style.marginTop = 3;
-                        separator.style.marginBottom = 6;
-                        return separator;
+                        VisualElement BuildSeparator()
+                        {
+                            VisualElement element = new VisualElement();
+                            element.style.height = 0;
+                            element.style.borderTopWidth = 1;
+                            element.style.borderBottomWidth = 1;
+                            element.style.borderTopColor = new Color(0, 0, 0, 0.3f);
+                            element.style.borderBottomColor = new Color(1, 1, 1, 0.2f);
+                            element.style.marginTop = 3;
+                            element.style.marginBottom = 6;
+                            element.style.flexGrow = 1;
+                            return element;
+                        }
+
+                        if (string.IsNullOrEmpty(content.text))
+                        {
+                            VisualElement separator = BuildSeparator();
+                            separator.SetMargin(5, 0, 0, 15);
+                            return separator;
+                        }
+                        else
+                        {
+                            VisualElement horizontal = new VisualElement();
+                            horizontal.SetMargin(5, 0, 0, 15);
+                            horizontal.style.flexDirection = FlexDirection.Row;
+
+                            horizontal.Add(BuildSeparator());
+
+                            TextElement label = new TextElement();
+                            label.text = content.text;
+                            label.style.fontSize = 13;
+                            label.style.opacity = 0.7f;
+                            label.SetMargin(0, 5, 5, -4);
+                            horizontal.Add(label);
+
+                            horizontal.Add(BuildSeparator());
+
+
+                            return horizontal;
+                        }
                     }
 
                 case TutoPage.Type.BeginCallout:
@@ -594,9 +688,44 @@ namespace Challenges
                         VisualElement callout = new VisualElement();
                         callout.SetPadding(10, 10, 10, 10);
                         callout.SetMargin(10, 0, 0, 10);
-                        callout.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f, 1.0f);
                         callout.SetBorderRadius(10);
+                        callout.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f, 1.0f);
                         callout.name = "Container";
+
+                        VisualElement horizontal = null;
+                        if (!string.IsNullOrEmpty(content.altText) || !string.IsNullOrEmpty(content.text))
+                        {
+                            horizontal = new VisualElement();
+                            horizontal.name = "Horizontal";
+                            horizontal.style.flexDirection = FlexDirection.Row;
+                            callout.Add(horizontal);
+                        }
+
+                        //Icon
+                        if (!string.IsNullOrEmpty(content.altText))
+                        {
+                            VisualElement icon = new VisualElement();
+                            icon.name = "Icon";
+                            icon.style.width = 32;
+                            icon.style.height = 32;
+                            icon.style.unityBackgroundImageTintColor = content.color;
+                            icon.SetMargin(0, -3, 5, -3);
+                            callout.style.paddingLeft = 46;
+                            horizontal.style.marginLeft = -34;
+                            horizontal.Add(icon);
+                            Updater_Editor.DownloadFile(content.altText, (DownloadHandler dh) => GetOnlineIcon(icon, dh), true);
+                        }
+
+                        //Title
+                        if (!string.IsNullOrEmpty(content.text))
+                        {
+                            TextElement title = new TextElement();
+                            title.name = "Title";
+                            title.style.fontSize = 24;
+                            title.text = content.text;
+                            horizontal.Add(title);
+                        }
+
                         return callout;
                     }
 
@@ -662,10 +791,99 @@ namespace Challenges
                         containerAction = TutoPage.Container.Exit;
                         return null;
                     }
-                    break;
+
+                case TutoPage.Type.Icon:
+                    {
+                        VisualElement horizontal = new VisualElement();
+                        horizontal.style.flexDirection = FlexDirection.Row;
+
+                        //Icon
+                        VisualElement icon = new VisualElement();
+                        icon.style.width = 32;
+                        icon.style.height = 32;
+                        icon.style.opacity = 0.7f;
+                        icon.style.unityBackgroundImageTintColor = content.color;
+                        icon.SetMargin(0, 0, 5, 10);
+                        horizontal.Add(icon);
+                        if (!string.IsNullOrEmpty(content.altText))
+                        {
+                            Updater_Editor.DownloadFile(content.altText, (DownloadHandler dh) => GetOnlineIcon(icon, dh), true);
+                        }
+
+
+                        //Title
+                        if (!string.IsNullOrEmpty(content.text))
+                        {
+                            TextElement title = new TextElement();
+                            title.style.fontSize = 24;
+                            title.style.marginTop = 12;
+                            title.text = content.text;
+                            horizontal.Add(title);
+                        }
+
+                        return horizontal;
+                    }
+
+                case TutoPage.Type.LinkToChallenge:
+                    {
+                        Updater_Editor.Status targetStatus = Updater_Editor.GetChallengeStatus(content.text);
+                        TutoPack target = targetStatus.pack;
+
+                        //Main button
+                        Button button = new Button();
+                        button.style.height = 60;
+                        button.style.maxWidth = 230;
+                        button.SetBorderRadius(10);
+                        button.SetCursor(MouseCursor.Link);
+                        button.SetMargin(5, 0, 0, 5);
+                        button.style.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 1.0f);
+                        if (target != null)
+                            button.clicked += () => Challenges.Open(target);
+
+                        //Background
+                        VisualElement preview = new VisualElement();
+                        preview.pickingMode = PickingMode.Ignore;
+                        preview.StretchToParentSize();
+                        preview.style.unityBackgroundImageTintColor = new Color(0.8f, 0.8f, 0.8f, 1.0f);
+                        preview.style.backgroundSize = new StyleBackgroundSize(new BackgroundSize(BackgroundSizeType.Cover));
+                        preview.style.backgroundPositionX = new StyleBackgroundPosition(new BackgroundPosition(BackgroundPositionKeyword.Right));
+                        if (target != null && target.preview != null)
+                            preview.style.backgroundImage = target.preview;
+                        button.Add(preview);
+
+                        //Title
+                        TextElement title = new TextElement();
+                        title.pickingMode = PickingMode.Ignore;
+                        title.style.position = Position.Absolute;
+                        title.style.top = 3;
+                        title.style.left = 7;
+                        title.style.fontSize = 20;
+                        title.text = string.IsNullOrEmpty(content.altText) ? content.text : content.altText;
+                        button.Add(title);
+
+                        //Description
+                        TextElement description = new TextElement();
+                        description.pickingMode = PickingMode.Ignore;
+                        description.style.position = Position.Absolute;
+                        description.style.left = 7;
+                        description.style.top = 28;
+                        description.text = target != null ? "Clic to open the Challenge" : "Unable to find the challenge";
+                        button.Add(description);
+
+
+                        return button;
+                    }
+
             }
 
             return null;
+        }
+
+        private static void GetOnlineIcon(VisualElement element, DownloadHandler dh)
+        {
+            Texture2D tex = new Texture2D(32, 32, TextureFormat.PVRTC_RGBA4, false);
+            tex.LoadImage(dh.data);
+            element.style.backgroundImage = tex;
         }
     }
 
@@ -980,6 +1198,9 @@ namespace Challenges
 
             private void OnGUI()
             {
+                if (image == null)
+                    return;
+
                 Rect rect = GUILayoutUtility.GetRect(1, 1, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                 float width = (image.width / (float)image.height) * rect.height;
                 rect = Rect.MinMaxRect(rect.xMax - width, rect.yMin, rect.xMax, rect.yMax);
@@ -1241,6 +1462,8 @@ namespace Challenges
     public class ChallengePreferencePage : VisualElement
     {
         private Challenges window;
+        private VisualElement devContent;
+        private Toggle developerMode;
         private int fieldID;
 
         public ChallengePreferencePage(Challenges window)
@@ -1278,10 +1501,37 @@ namespace Challenges
             SetCheckEverydayUpdateToggle(everydayUpdates);
             properties.Add(everydayUpdates);
 
-            Toggle developerMode = new Toggle("Developer mode");
+            developerMode = new Toggle("Developer mode");
             SetToggleStyle(developerMode);
             LinkToggleToPref(developerMode, Challenges.developerModePrefName, Challenges.developerModeDefaultValue);
             properties.Add(developerMode);
+
+            devContent = new VisualElement();
+            devContent.SetVisibility(EditorPrefs.GetBool(Challenges.developerModePrefName, Challenges.developerModeDefaultValue));
+            properties.Add(devContent);
+
+            devContent.Add(Challenges.BuildElement(new TutoPage.Content() { type = TutoPage.Type.Separator, text = "Developer Settings"}));
+
+
+            //New challenge button
+            Button newChallenge = new Button();
+            newChallenge.text = "Create a new Challenge";
+            newChallenge.clicked += Updater_Editor.CreateNewChallenge;
+            devContent.Add(newChallenge);
+
+
+            //Push Updater button
+            Button pushUpdaterMinor = new Button();
+            pushUpdaterMinor.text = "Push a new version of the updater (Minor)";
+            pushUpdaterMinor.clicked += () => Updater_Editor.PushNewUpdaterVersion(false);
+            devContent.Add(pushUpdaterMinor);
+
+            //Push Updater button
+            Button pushUpdaterMajor = new Button();
+            pushUpdaterMajor.text = "Push a new version of the updater (Major)";
+            pushUpdaterMajor.clicked += () => Updater_Editor.PushNewUpdaterVersion(true);
+            devContent.Add(pushUpdaterMajor);
+
 
             Button closeBtn = new Button();
             closeBtn.text = "Close";
@@ -1338,6 +1588,13 @@ namespace Challenges
                 EditorPrefs.SetBool(Challenges.checkUpdateEverydayPrefName, e.newValue);
                 EditorPrefs.SetString(Challenges.lastUpdatePrefPrefName, "");
             }
+        }
+
+        public void Refresh()
+        {
+            bool inDevMode = EditorPrefs.GetBool(Challenges.developerModePrefName, Challenges.developerModeDefaultValue);
+            devContent.SetVisibility(inDevMode);
+            developerMode.SetValueWithoutNotify(inDevMode);
         }
     }
 
@@ -2054,6 +2311,19 @@ namespace Challenges
             element.style.marginLeft = left;
             element.style.marginRight = right;
             element.style.marginTop = top;
+        }
+
+        public static void SetVisibility(this VisualElement element, bool value)
+        {
+            element.style.display = value ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        public static void SetCursor(this VisualElement element, MouseCursor cursor)
+        {
+            object objCursor = new Cursor();
+            PropertyInfo fields = typeof(Cursor).GetProperty("defaultCursorId", BindingFlags.NonPublic | BindingFlags.Instance);
+            fields.SetValue(objCursor, (int)cursor);
+            element.style.cursor = new StyleCursor((Cursor)objCursor);
         }
     }
 

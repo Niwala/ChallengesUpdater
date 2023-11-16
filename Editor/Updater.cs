@@ -226,12 +226,12 @@ namespace Challenges
                     menu.AddSeparator("");
                     menu.AddDisabledItem(new GUIContent("⠀"));
                     menu.AddDisabledItem(new GUIContent("Dev area"));
-                    menu.AddItem(new GUIContent("Export current Updater version"), false, () => { GenerateUpdaterInfo(false); });
-                    menu.AddItem(new GUIContent("Export a new Updater version"), false, () => { GenerateUpdaterInfo(true); });
+                    menu.AddItem(new GUIContent("Export current Updater version"), false, () => { PushNewUpdaterVersion(false); });
+                    menu.AddItem(new GUIContent("Export a new Updater version"), false, () => { PushNewUpdaterVersion(true); });
                     menu.AddItem(new GUIContent("Generate Readme File"), false, () => { GenerateReadme(); });
-                    menu.AddItem(new GUIContent("Export all challenges"), false, () => { GenerateUpdaterInfo(false); ExportAllChallenges(); });
+                    menu.AddItem(new GUIContent("Export all challenges"), false, () => { PushNewUpdaterVersion(false); ExportAllChallenges(); });
                     menu.AddSeparator("");
-                    menu.AddItem(new GUIContent("Publish everthing"), false, () => { GenerateReadme(); GenerateUpdaterInfo(false); ExportAllChallenges(); });
+                    menu.AddItem(new GUIContent("Publish everthing"), false, () => { GenerateReadme(); PushNewUpdaterVersion(false); ExportAllChallenges(); });
                 }
 
                 menu.DropDown(rect);
@@ -743,7 +743,7 @@ namespace Challenges
             }
         }
 
-        private static void DownloadFile(string uri, Action<DownloadHandler> callback)
+        public static void DownloadFile(string uri, Action<DownloadHandler> callback, bool silent = false)
         {
             //EditorUtility.DisplayProgressBar("Challenges Updater", "Download files", 0.0f);
             currentRequest = UnityWebRequest.Get(uri);
@@ -757,7 +757,7 @@ namespace Challenges
                 EditorApplication.update -= TrackRequestProgress;
                 //EditorUtility.ClearProgressBar();
 
-                if (LogErrorIfAny(request))
+                if (!silent && LogErrorIfAny(request))
                     return;
 
                 string[] pages = uri.Split('/');
@@ -861,7 +861,65 @@ namespace Challenges
                 FirstOrDefault(x => x.name == name));
         }
 
-        public static void GenerateUpdaterInfo(bool incrementVersion)
+        public static void CreateNewChallenge()
+        {
+            string directory = EditorUtility.SaveFilePanelInProject("Challenges", "Untitle", "", "Create a new Challenge\nNo need to create a container folder, it will be automatically generated.", "Challenges\\");
+            if (string.IsNullOrEmpty(directory))
+                return;
+
+            string ToLocalPath(string absolutePath)
+            {
+                return absolutePath.Remove(0, Application.dataPath.Length - 6);
+            }
+
+            string challengeName = new DirectoryInfo(directory).Name;
+            string parentDirectory = ToLocalPath(new FileInfo(directory).DirectoryName);
+            string challengePath = $"{directory}\\{challengeName}.asset";
+
+            if (parentDirectory != "Assets\\Challenges")
+            {
+                if (!EditorUtility.DisplayDialog("Challenges", "The ideal place for challenges is in the \"Assets\\Challenges\" directory.\nWould you like to continue?", "Continue", "Chose another location"))
+                {
+                    CreateNewChallenge();
+                    return;
+                }
+            }
+
+            //Create Challenge directories
+            AssetDatabase.CreateFolder(parentDirectory, challengeName);
+            AssetDatabase.CreateFolder(directory, "Content");
+
+            //Create challenge
+            TutoPack challenge = CreateInstance<TutoPack>();
+            challenge.pages.Add(new TutoPage());
+            challenge.pages[0].content.Add(new TutoPage.Content() { type = TutoPage.Type.Title, text = challengeName });
+            challenge.name = challengeName;
+            challenge.hidden = true;
+            AssetDatabase.CreateAsset(challenge, challengePath);
+            AssetDatabase.ImportAsset(challengePath, ImportAssetOptions.ForceUpdate);
+            challenge = AssetDatabase.LoadAssetAtPath<TutoPack>(challengePath);
+
+            Challenges.Open(challenge);
+
+            Selection.activeObject = challenge;
+        }
+
+        public static Status GetChallengeStatus(string name)
+        {
+            foreach (var status in challengeList)
+            {
+                if (status.name == name)
+                    return status;
+            }
+            return default;
+        }
+
+        public static TutoPack GetChallenge(string name)
+        {
+            return GetChallengeStatus(name).pack;
+        }
+
+        public static void PushNewUpdaterVersion(bool incrementVersion)
         {
             //Load info from package json file (Unity formating)
             string filePath = GetFilePath();
@@ -990,13 +1048,13 @@ namespace Challenges
 
             //Reorder infos
             List<ChallengeInfo> sortedChallenges = new List<ChallengeInfo>();
-            sortedChallenges = infos.Values.Where(x => !x.hidden && !string.IsNullOrEmpty(x.name)).OrderBy(x => x.priority).ToList();
+            sortedChallenges = infos.Values.Where(x => !string.IsNullOrEmpty(x.name)).OrderBy(x => x.priority).ToList();
 
             //Load local packs
             string[] challengeGUIDs = AssetDatabase.FindAssets($"t:{typeof(TutoPack).Name}");
             List<TutoPack> packs = challengeGUIDs.ToList().
                 Select(x => AssetDatabase.LoadAssetAtPath<TutoPack>(AssetDatabase.GUIDToAssetPath(x))).
-                Where(x => x != null && !x.hidden).OrderBy(x => x.priority).ToList();
+                Where(x => x != null).OrderBy(x => x.priority).ToList();
             Dictionary<string, TutoPack> nameToPack = new Dictionary<string, TutoPack>();
             for (int i = 0; i < packs.Count; i++)
             {
@@ -1144,6 +1202,9 @@ namespace Challenges
 
             for (int i = 0; i < challengeList.Count; i++)
             {
+                if (challengeList[i].hidden)
+                    continue;
+
                 //Teacher filter
                 if (!string.IsNullOrEmpty(teacher) && challengeList[i].teacher != teacher)
                     continue;
@@ -1299,6 +1360,7 @@ namespace Challenges
         public struct Status
         {
             public TutoPack pack;
+            public bool hidden;
             public string name;
             public string teacher;
             public string tags;
@@ -1309,6 +1371,7 @@ namespace Challenges
             public Status(TutoPack pack, ChallengeStatus status)
             {
                 this.pack = pack;
+                this.hidden = pack.hidden;
                 this.name = pack.name;
                 this.status = status;
                 this.teacher = pack.teacher;
@@ -1320,6 +1383,7 @@ namespace Challenges
             public Status(ChallengeInfo infos, ChallengeStatus status)
             {
                 this.pack = null;
+                this.hidden = infos.hidden;
                 this.name = infos.name;
                 this.status = status;
                 this.teacher = infos.teacher;
