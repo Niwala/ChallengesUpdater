@@ -232,6 +232,7 @@ namespace Challenges
             EditorUtility.DisplayProgressBar("Challenges Updater", "Downloading the package...", 0.0f);
             Client.Add(Updater.gitUpdaterUrl);
             EditorUtility.ClearProgressBar();
+            onStopLoading.Invoke();
         }
 
         public static string GetDataPath()
