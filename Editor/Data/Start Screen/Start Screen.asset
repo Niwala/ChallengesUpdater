@@ -1,0 +1,155 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16dcc16ebe0f2c741b007c466ad36804, type: 3}
+  m_Name: Start Screen
+  m_EditorClassIdentifier: 
+  parent: {fileID: 0}
+  pages:
+  - content:
+    - type: 0
+      text: "Bienvenu\xB7e dans les Challenges"
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 3
+      text: "Cet utilitaire permet de facilement t\xE9l\xE9charger des challenges
+        avec ressources et tutorials."
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 9
+      text: 
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 13
+      text: Ouvrir les challenges
+      altText: https://img.icons8.com/?size=50&id=PUfUkylPOiJ1&format=png&color=FFFFFF
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0.18039216, g: 0.48627454, b: 0.8196079, a: 1}
+    - type: 3
+      text: "Pour ouvrir la fen\xEAtre des challenges, utilisez le raccourci <b><color=#469cfa>Alt+U</color></b>
+        ou le menu Challenges en haut de votre \xE9cran."
+      altText: 
+      padding: 0
+      obj: {fileID: 2800000, guid: 37ba032dfc1026946a254be3f6192fc7, type: 3}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 14
+      text: "Pour ouvrir la fen\xEAtre des challenges, utilisez le raccourcis Alt
+        + U."
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 13
+      text: Naviguer dans les challenges
+      altText: https://img.icons8.com/?size=64&id=Zn8Ldu9A4hYc&format=png&color=FFFFFF
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0.18039216, g: 0.48627454, b: 0.8196079, a: 1}
+    - type: 3
+      text: "La premi\xE8re barre d'outil permet de revenir sur l'\xE9cran principal.\r\n\r\nLe
+        seconde permet de changer les pages du Challenge affich\xE9.\r\n"
+      altText: 
+      padding: 0
+      obj: {fileID: 2800000, guid: 6e53e53b9f11793469a55d5b00dc492a, type: 3}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 14
+      text: "Pour ouvrir la fen\xEAtre des challenges, utilisez le raccourcis Alt
+        + U."
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 13
+      text: Besoin d'aide ?
+      altText: https://img.icons8.com/?size=48&id=6qjqdpPur5LN&format=png&color=FFFFFF
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0.18039216, g: 0.48627454, b: 0.8196079, a: 1}
+    - type: 1
+      text: Notion
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 3
+      text: 'Vous pouvez retrouver le <a href=https://samtechart.notion.site/Cours-097fdfbd6e4c422c8a0a68de00e2b40d?pvs=4>support
+        de cours sur Notion</a>.
+
+'
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 1
+      text: Amplify Shader Editor
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 3
+      text: 'Vous pouvez retrouver <a href=https://heajbe.sharepoint.com/:u:/r/sites/ICNJVB2Tech23-24/Supports%20de%20cours/TPIE%20-%20Visual%20Effects%20-%20Sam/AmplifyShaderEditor.unitypackage?csf=1&web=1&e=rMolmE>Amplify
+        Shader Editor sur Teams.</a>
+
+'
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 1
+      text: Me contacter
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 3
+      text: "Je pr\xE9f\xE8re un message rapide sur Discord en cas de soucis ou de
+        questions. Vous retrouverez mon profil sur le serveur <b>HEAJ - Video Games</b>"
+      altText: 
+      padding: 0
+      obj: {fileID: 2800000, guid: a632d1f329772aa419785fa42de741d9, type: 3}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 3
+      text: "\nSi vous \xEAtes plus \xE0 l'aise avec cela ou si il est n\xE9cessaire
+        de passer par un \xE9change officiel, vous pouvez aussi me contacter sur
+        mon adresse mail de l'\xE9cole."
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 6
+      text: samuel.jemine@heaj.be
+      altText: Mail
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+    - type: 14
+      text: "Pour ouvrir la fen\xEAtre des challenges, utilisez le raccourcis Alt
+        + U."
+      altText: 
+      padding: 0
+      obj: {fileID: 0}
+      color: {r: 0, g: 0, b: 0, a: 0}
+  description: 
+  preview: {fileID: 2800000, guid: fe44484a39fbbb54fa62cfa793f562f7, type: 3}
+  priority: 0
+  hidden: 1
+  teacher: Sam
+  tags: 
+  scene: {fileID: 0}
+  onOpen: 
+  hash: 
