@@ -46,6 +46,7 @@ namespace Challenges
         public const string amplifyURL = "https://samtechart.notion.site/Amplify-Shader-Editor-0e6b4796f90646a7b0d8aa2cf1f4a3b2?pvs=4";
         public const string documentationURL = "https://samtechart.notion.site/Challenges-bff753d22b604363bceab8501c32bd4f?pvs=4";
 
+        private static UpdaterInfo projectInfo;
         private static UpdaterStatus updaterStatus;
         private static string updaterErrorTitle;
         private static string updaterErrorMessage;
@@ -742,7 +743,7 @@ namespace Challenges
             string uri = $"{Updater.gitDownloadUrl}/Index.json";
             DownloadFile(uri, (DownloadHandler handler) =>
             {
-                UpdaterInfo projectInfo = JsonUtility.FromJson<UpdaterInfo>(handler.text);
+                projectInfo = JsonUtility.FromJson<UpdaterInfo>(handler.text);
                 string file = JsonUtility.ToJson(projectInfo);
                 File.WriteAllText($"{cacheDir}/UpdaterInfo.json", file);
 
@@ -881,6 +882,22 @@ namespace Challenges
 
             bool URPGraphicSettings = GraphicsSettings.currentRenderPipeline != null && GraphicsSettings.currentRenderPipeline.GetType().ToString().StartsWith("UnityEngine.Rendering.Universal");
             bool URPQualitySettings = QualitySettings.renderPipeline != null && QualitySettings.renderPipeline.GetType().ToString().StartsWith("UnityEngine.Rendering.Universal");
+
+            //Check Updater status
+            UnityPackage packageInfo = UnityPackage.FindForPackageName("https://github.com/Niwala/ChallengesUpdater.git");
+
+            if (packageInfo != null && projectInfo.version != packageInfo.version)
+            {
+                NotificationInfo outdatedPackage = new NotificationInfo(
+                    "Challenges Updater",
+                    "Une mise à jour est disponible pour le Package des Challenges",
+                    "Update Package",
+                    UpdateTheUpdater
+                    );
+
+                if (includeDismiss || !NotificationIsDismiss(outdatedPackage))
+                    notifications.Add(outdatedPackage);
+            }
 
 
             //Check Amplify

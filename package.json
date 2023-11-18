@@ -1,7 +1,7 @@
 {
     "name": "com.niwala.challengesupdater",
     "displayName": "Challenges Updater",
-    "version": "0.1.31",
+    "version": "0.1.32",
     "unity": "2022.2",
     "description": "A series of TechArt challenges for students of the Haute Ecole Albert Jacquard.",
     "unityVersion": "",
