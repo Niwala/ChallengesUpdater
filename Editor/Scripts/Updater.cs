@@ -248,7 +248,7 @@ namespace Challenges
             //Plugin is in Package Cache
             else
             {
-                dataPath = "Packages\\com.niwala.challengesupdater\\";
+                dataPath = "Packages\\com.niwala.challengesupdater\\Editor\\Data\\";
             }
 
             cachedDataPath = dataPath;
@@ -268,10 +268,10 @@ namespace Challenges
             string dataPath = GetDataPath();
 
             if (previewMask == null)
-                previewMask = AssetDatabase.LoadAssetAtPath<Texture2D>(dataPath + "PreviewMask.png");
+                previewMask = LoadData<Texture2D>("PreviewMask.png");
 
             if (previewShader == null)
-                previewShader = AssetDatabase.LoadAssetAtPath<Shader>(dataPath + "PreviewShader.shader");
+                previewShader = LoadData<Shader>("PreviewShader.shader");
 
             if (previewMaterial == null)
                 previewMaterial = new Material(previewShader);
