@@ -573,7 +573,7 @@ namespace Challenges
                 case Page.Type.LinkToChallenge:
                     {
                         Updater.Status targetStatus = Updater.GetChallengeStatus(content.text);
-                        Challenge target = targetStatus.pack;
+                        Challenge target = targetStatus.challenge;
 
                         //Main button
                         Button button = new Button();

@@ -264,6 +264,7 @@ namespace Challenges
 
         public void OnCacheLoaded()
         {
+            selectionPage.Refresh();
             updateToolbar.Stop();
             OpenPage(selectionPage);
         }
@@ -459,6 +460,8 @@ namespace Challenges
                 this.status = status;
 
                 //Register events
+                RegisterCallback<AttachToPanelEvent>(OnAttachPanel);
+                RegisterCallback<DetachFromPanelEvent>(OnDetachPanel);
                 RegisterCallback<MouseEnterEvent>(MouseEnter);
                 RegisterCallback<MouseLeaveEvent>(MouseLeave);
                 RegisterCallback<MouseDownEvent>(MouseDown);
@@ -527,6 +530,24 @@ namespace Challenges
                 Add(statusIcon);
             }
 
+            private void OnAttachPanel(AttachToPanelEvent e)
+            {
+                Updater.onChallengeChanged += OnChallengeChanged;
+            }
+
+            private void OnDetachPanel(DetachFromPanelEvent e)
+            {
+                Updater.onChallengeChanged -= OnChallengeChanged;
+            }
+
+            private void OnChallengeChanged(Updater.Status newStatus)
+            {
+                if (status.name == newStatus.name) 
+                {
+                    background.loading = newStatus.status == Updater.ChallengeStatus.Loading;
+                }
+            }
+
             private void MouseEnter(MouseEnterEvent e)
             {
                 cover.style.display = DisplayStyle.Flex;
@@ -543,20 +564,31 @@ namespace Challenges
             {
                 if (e.button == 0)
                 {
-                    window.OpenChallenge(status.pack);
+                    if (status.challenge != null)
+                        window.OpenChallenge(status.challenge);
+                    else
+                        Updater.DownloadChallenge(status.name);
                 }
                 else if (e.button == 1)
                 {
                     GenericMenu menu = new GenericMenu();
-                    menu.AddItem(new GUIContent("Open"), false, () => window.OpenChallenge(status.pack));
-                    menu.AddItem(new GUIContent("Reset"), false, () => Updater.DownloadChallenge(status.name));
 
+                    if (status.challenge != null)
+                    {
+                        menu.AddItem(new GUIContent("Open"), false, () => window.OpenChallenge(status.challenge));
+                        menu.AddItem(new GUIContent("Reset"), false, () => Updater.DownloadChallenge(status.name));
+                        menu.AddItem(new GUIContent("Remove"), false, () => Updater.DeleteChallenge(status.name));
+                    }
+                    else
+                    {
+                        menu.AddItem(new GUIContent("Download"), false, () => Updater.DownloadChallenge(status.name));
+                    }
 
                     menu.ShowAsContext();
                 }
                 else if (e.button == 2)
                 {
-                    Selection.activeObject = status.pack;
+                    Selection.activeObject = status.challenge;
                 }
 
             }
@@ -572,6 +604,7 @@ namespace Challenges
             private Texture2D image;
             private Rect clipRect;
             private VisualElement viewPort;
+            public bool loading;
 
             public ChallengeBackground(Texture2D image)
             {
@@ -605,8 +638,11 @@ namespace Challenges
                 if (Updater.previewMaterial == null)
                     Updater.LoadResources();
 
+                Updater.previewMaterial.SetVector("_TexSize", new Vector4(rect.width, rect.height, 1.0f / rect.width, 1.0f / rect.height));
                 Updater.previewMaterial.SetTexture("_Mask", Updater.previewMask);
                 Updater.previewMaterial.SetInt("_ColorSpace", (int)PlayerSettings.colorSpace);
+                Updater.previewMaterial.SetFloat("_EditorTime", (float)(EditorApplication.timeSinceStartup % 10000));
+                Updater.previewMaterial.SetFloat("_Loading", loading ? 1.0f : 0.0f);
                 SetRectToPreviewMaterial("_WorldRect", worldRect);
                 SetRectToPreviewMaterial("_WorldClip", worldClip);
                 EditorGUI.DrawPreviewTexture(rect, image, Updater.previewMaterial);
@@ -973,7 +1009,7 @@ namespace Challenges
                 if (e.previousValue == e.newValue)
                     return;
 
-                Preferences.checkUpdateEveryday.value =  e.newValue;
+                Preferences.checkUpdateEveryday.value = e.newValue;
                 Preferences.lastUpdate.value = "";
             }
         }

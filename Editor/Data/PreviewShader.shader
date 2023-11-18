@@ -37,6 +37,9 @@ Shader "Hidden/PreviewShader"
             int _ColorSpace;
             float4 _WorldClip;
             float4 _WorldRect;
+            float4 _TexSize;
+            float _EditorTime;
+            float _Loading;
 
             v2f vert (appdata v)
             {
@@ -55,6 +58,23 @@ Shader "Hidden/PreviewShader"
 
                 fixed4 col = tex2D(_MainTex, i.uv);
                 col.a = tex2D(_Mask, i.uv).r;
+
+                //Loading circle
+                float2 circleCenter = _TexSize.xy - 24;
+                float circleRange = distance(circleCenter, i.uv * _TexSize.xy);
+                float circle = smoothstep(20, 18, circleRange) * smoothstep(14, 16, circleRange);
+
+
+                float2 cone = float2(sin(_EditorTime * 4), cos(_EditorTime * 4));
+                float coneSize = sin(_EditorTime * 2);
+                coneSize = smoothstep(0, 1, coneSize * 0.5 + 0.5) * 2 -1;
+                coneSize *= 0.8;
+                float2 uvDirection = normalize(circleCenter - i.uv * _TexSize.xy);
+
+                float inCone = smoothstep(coneSize, coneSize + 0.1, dot(cone, uvDirection));
+
+
+                col = lerp(col, float4(1, 1, 1, 1), circle * inCone * 0.7 * _Loading);
 
                 //Gamma correction
                 if (_ColorSpace == 1)

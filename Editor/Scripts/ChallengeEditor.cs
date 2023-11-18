@@ -1239,7 +1239,7 @@ namespace Challenges
 
         public static string GetDirectory(string name)
         {
-            string[] guids = AssetDatabase.FindAssets($"t:TutoPack {name}");
+            string[] guids = AssetDatabase.FindAssets($"t:{nameof(Challenge)} {name}");
 
             for (int i = 0; i < guids.Length; i++)
             {

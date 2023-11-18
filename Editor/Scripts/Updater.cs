@@ -18,6 +18,7 @@ using Debug = UnityEngine.Debug;
 using System;
 using UnityEngine.Rendering;
 using static Challenges.Updater;
+using UnityEngine.Serialization;
 
 namespace Challenges
 {
@@ -58,9 +59,10 @@ namespace Challenges
         public static OnIOActionDone onCacheUpdated;
         public static OnIOActionDone onCacheLoaded;
         public static OnIOActionDone onChallengeInfosDownloaded;
+        public static OnChallengeIOActionDone onChallengeChanged;
         public static OnChallengeIOActionDone onChallengeUpdated;
         public delegate void OnIOActionDone();
-        public delegate void OnChallengeIOActionDone(Challenge challenge);
+        public delegate void OnChallengeIOActionDone(Status challengeStatus);
 
         public static Texture2D previewMask;
         public static Shader previewShader;
@@ -299,16 +301,16 @@ namespace Challenges
         {
             switch (status)
             {
-                case ChallengeStatus.Good:
+                case ChallengeStatus.Valid:
                     GUI.Label(rect, validIcon);
                     break;
-                case ChallengeStatus.MinorUpdate:
+                case ChallengeStatus.Outdated:
                     GUI.Label(rect, minorUpdateIcon);
                     break;
-                case ChallengeStatus.MajorUpdate:
+                case ChallengeStatus.Loading:
                     GUI.Label(rect, majorUpdateIcon);
                     break;
-                case ChallengeStatus.New:
+                case ChallengeStatus.Downloadable:
                     GUI.Label(rect, newIcon);
                     break;
                 case ChallengeStatus.Deprecated:
@@ -321,13 +323,13 @@ namespace Challenges
         {
             switch (status)
             {
-                case ChallengeStatus.Good:
+                case ChallengeStatus.Valid:
                     return validIcon.image as Texture2D;
-                case ChallengeStatus.MinorUpdate:
+                case ChallengeStatus.Outdated:
                     return minorUpdateIcon.image as Texture2D;
-                case ChallengeStatus.MajorUpdate:
+                case ChallengeStatus.Loading:
                     return majorUpdateIcon.image as Texture2D;
-                case ChallengeStatus.New:
+                case ChallengeStatus.Downloadable:
                     return newIcon.image as Texture2D;
                 case ChallengeStatus.Deprecated:
                     return depreciatedIcon.image as Texture2D;
@@ -339,13 +341,13 @@ namespace Challenges
         {
             switch (status)
             {
-                case ChallengeStatus.Good:
+                case ChallengeStatus.Valid:
                     return validIcon.tooltip;
-                case ChallengeStatus.MinorUpdate:
+                case ChallengeStatus.Outdated:
                     return minorUpdateIcon.tooltip;
-                case ChallengeStatus.MajorUpdate:
+                case ChallengeStatus.Loading:
                     return majorUpdateIcon.tooltip;
-                case ChallengeStatus.New:
+                case ChallengeStatus.Downloadable:
                     return newIcon.tooltip;
                 case ChallengeStatus.Deprecated:
                     return depreciatedIcon.tooltip;
@@ -547,7 +549,7 @@ namespace Challenges
 
         public static Challenge GetChallenge(string name)
         {
-            return GetChallengeStatus(name).pack;
+            return GetChallengeStatus(name).challenge;
         }
 
         public static void PushNewUpdaterVersion(bool incrementVersion)
@@ -708,15 +710,15 @@ namespace Challenges
                 {
                     Challenge pack = nameToPack[info.name];
                     if (pack.hash == info.hash)
-                        challengeList.Add(new Status(pack, ChallengeStatus.Good));
+                        challengeList.Add(new Status(pack, ChallengeStatus.Valid));
                     else
-                        challengeList.Add(new Status(pack, ChallengeStatus.MajorUpdate));
+                        challengeList.Add(new Status(pack, ChallengeStatus.Loading));
 
                     nameToPack.Remove(info.name);
                 }
                 else
                 {
-                    challengeList.Add(new Status(info, ChallengeStatus.New));
+                    challengeList.Add(new Status(info, ChallengeStatus.Downloadable));
                 }
             }
 
@@ -993,7 +995,7 @@ namespace Challenges
             }
         }
 
-        public static void DownloadPackage(string uri, bool manualImport = false)
+        private static void DownloadPackage(string uri, bool manualImport = false, Action callback = null)
         {
             DownloadFile(uri, (DownloadHandler handler) =>
             {
@@ -1006,12 +1008,14 @@ namespace Challenges
                 AssetDatabase.importPackageFailed += ImportPackageFailed;
                 AssetDatabase.importPackageCancelled += ImportPackageCancelled;
                 AssetDatabase.ImportPackage(path + "Challenge.unitypackage", manualImport);
+                callback?.Invoke();
             });
         }
 
         public static void DownloadChallenge(string name, bool manualImport = false)
         {
-            DownloadPackage($"{Updater.gitDownloadUrl}/Challenges/{name}.unitypackage", manualImport);
+            onStartLoading.Invoke("Download " + name);
+            DownloadPackage($"{gitDownloadUrl}/Challenges/{name}.unitypackage", manualImport, null);
         }
 
         private static bool LogErrorIfAny(UnityWebRequest request)
@@ -1081,7 +1085,8 @@ namespace Challenges
         #region Structs & Net Structs
         public struct Status
         {
-            public Challenge pack;
+            [FormerlySerializedAs("pack")]
+            public Challenge challenge;
             public bool hidden;
             public string name;
             public string teacher;
@@ -1092,7 +1097,7 @@ namespace Challenges
 
             public Status(Challenge pack, ChallengeStatus status)
             {
-                this.pack = pack;
+                this.challenge = pack;
                 this.hidden = pack.hidden;
                 this.name = pack.name;
                 this.status = status;
@@ -1104,7 +1109,7 @@ namespace Challenges
 
             public Status(ChallengeInfo infos, ChallengeStatus status)
             {
-                this.pack = null;
+                this.challenge = null;
                 this.hidden = infos.hidden;
                 this.name = infos.name;
                 this.status = status;
@@ -1152,10 +1157,10 @@ namespace Challenges
 
         public enum ChallengeStatus
         {
-            Good,
-            MinorUpdate,
-            MajorUpdate,
-            New,
+            Valid,
+            Outdated,
+            Loading,
+            Downloadable,
             Deprecated
         }
 
