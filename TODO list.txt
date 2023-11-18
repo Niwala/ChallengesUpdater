@@ -1,0 +1,17 @@
+USER : 
+Possibilité de suprimer un challenge
+Callback une fois un challenge chargé - Update du status
+Vérifier le menu teacher
+Mieux aligner les icones de status
+
+
+DEV :
+Possibilité de rate un challenge
+Possibilité de reporter une erreur sur un challenge
+Possibilité de retirer un challenge du serveur
+
+
+
+Clean les anciennes fonctions
+Remettre les ancien challenges à jour
+Copy-Paste d'un bloc de contents ?

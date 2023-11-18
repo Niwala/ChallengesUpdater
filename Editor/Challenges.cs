@@ -143,6 +143,7 @@ namespace Challenges
             Updater_Editor.onStopLoading += updateToolbar.Stop;
             Updater_Editor.onCacheUpdated += OnCacheUpdated;
             Updater_Editor.onCacheLoaded += OnCacheLoaded;
+            Undo.undoRedoPerformed += Refresh;
         }
 
         public void Refresh()
@@ -2029,7 +2030,7 @@ namespace Challenges
         {
             GenericMenu menu = new GenericMenu();
 
-            string[] names = System.Enum.GetNames(typeof(TutoPage.Type));
+            string[] names = Enum.GetNames(typeof(TutoPage.Type));
             for (int i = 0; i < names.Length; i++)
             {
                 int j = i;
@@ -2055,6 +2056,12 @@ namespace Challenges
                 .FindPropertyRelative(nameof(page.content))
                 .InsertArrayElementAtIndex(contentID);
 
+            obj.FindProperty(nameof(challenge.pages))
+                .GetArrayElementAtIndex(pageID)
+                .FindPropertyRelative(nameof(page.content))
+                .GetArrayElementAtIndex(contentID)
+                .FindPropertyRelative("type").enumValueIndex = (int)type;
+
             obj.ApplyModifiedProperties();
             RefreshPage();
         }
@@ -2069,6 +2076,11 @@ namespace Challenges
                 .GetArrayElementAtIndex(pageID)
                 .FindPropertyRelative(nameof(page.content))
                 .InsertArrayElementAtIndex(contentID);
+
+            if (Selection.activeObject is ChallengeElementContainer container)
+            {
+                ChallengeElementContainer.Open(challenge.pages[pageID], contentID + 1);
+            }
 
             obj.ApplyModifiedProperties();
             RefreshPage();

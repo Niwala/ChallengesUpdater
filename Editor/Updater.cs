@@ -82,7 +82,9 @@ namespace Challenges
         public static OnIOActionDone onCacheUpdated;
         public static OnIOActionDone onCacheLoaded;
         public static OnIOActionDone onChallengeInfosDownloaded;
+        public static OnChallengeIOActionDone onChallengeUpdated;
         public delegate void OnIOActionDone();
+        public delegate void OnChallengeIOActionDone(TutoPack challenge);
 
         public static Texture2D previewMask;
         public static Shader previewShader;
